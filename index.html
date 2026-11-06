@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoreo de Inundaciones - Goya, Corrientes</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 min-h-screen flex flex-col justify-between transition-colors duration-300 relative">
+
+    <!-- FONDO TEMÁTICO PARA INICIO DE SESIÓN -->
+    <div id="bg-hero" class="absolute inset-0 z-0 bg-cover bg-center opacity-25 dark:opacity-15 pointer-events-none" style="background-image: url('https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?q=80&w=1920&auto=format&fit=crop');"></div>
+
+    <!-- BOTÓN DE MODO CLARO / OSCURO -->
+    <div class="absolute top-4 right-4 z-20">
+        <button onclick="toggleDarkMode()" class="p-2.5 rounded-full bg-white dark:bg-slate-800 shadow-md text-slate-700 dark:text-yellow-400 hover:scale-105 transition-all">
+            <span id="theme-icon" class="text-xl">🌙</span>
+        </button>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="flex items-center justify-center flex-grow p-4 z-10">
+        
+        <!-- VISTA 1: AUTENTICACIÓN -->
+        <div id="auth-container" class="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+            <div class="text-center mb-6">
+                <h1 class="text-2xl font-bold text-slate-800 dark:text-white">Monitoreo Territorial</h1>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Corriente del Niño - Goya, Corrientes</p>
+            </div>
+
+            <div id="auth-tabs" class="flex border-b border-slate-200 dark:border-slate-700 mb-6">
+                <button id="tab-login" onclick="switchTab('login')" class="flex-1 pb-2 font-semibold text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 transition-all">Iniciar Sesión</button>
+                <button id="tab-register" onclick="switchTab('register')" class="flex-1 pb-2 font-semibold text-slate-400 dark:text-slate-500 hover:text-slate-600 transition-all">Registrarse</button>
+            </div>
+
+            <!-- FORMULARIO DE INICIO DE SESIÓN -->
+            <div id="form-login" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo Electrónico:</label>
+                    <input type="email" id="login-email" placeholder="tu_correo@gmail.com" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Contraseña:</label>
+                    <input type="password" id="login-password" placeholder="••••••••" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <button onclick="iniciarSesion()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors shadow-md">
+                    Iniciar Sesión
+                </button>
+                <div class="text-right">
+                    <button onclick="mostrarSeccionRecuperar()" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">¿Olvidaste tu contraseña?</button>
+                </div>
+            </div>
+
+            <!-- FORMULARIO DE REGISTRO -->
+            <div id="form-register" class="hidden space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nombre Completo:</label>
+                    <input type="text" id="reg-nombre" placeholder="Tu Nombre" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo Electrónico:</label>
+                    <input type="email" id="reg-email" placeholder="tu_correo@gmail.com" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Crear Contraseña:</label>
+                    <input type="password" id="reg-password" placeholder="••••••••" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <button onclick="registrarUsuario()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors shadow-md">
+                    Registrar Cuenta
+                </button>
+            </div>
+
+            <!-- FORMULARIO DE RECUPERACIÓN -->
+            <div id="form-recovery" class="hidden space-y-4">
+                <div class="text-center mb-2">
+                    <h3 class="font-bold text-slate-700 dark:text-slate-200">Recuperar Contraseña</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Ingresa tu correo para recibir un código de acceso.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo Electrónico:</label>
+                    <input type="email" id="rec-email" placeholder="tu_correo@gmail.com" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <button onclick="solicitarTokenRecuperacion()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 rounded-lg transition-colors shadow-md">
+                    Enviar Token por Gmail
+                </button>
+
+                <div id="recovery-token-section" class="hidden space-y-3 pt-4 border-t dark:border-slate-700">
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Código de 6 dígitos:</label>
+                    <input type="text" id="rec-code" placeholder="123456" maxlength="6" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg text-center tracking-widest text-lg font-bold">
+                    
+                    <label class="block text-sm font-medium text-slate-700 dark:text-slate-300">Nueva Contraseña:</label>
+                    <input type="password" id="rec-new-password" placeholder="••••••••" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
+
+                    <button onclick="verificarYCambiarPassword()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-colors shadow-md">
+                        Restablecer Contraseña
+                    </button>
+                </div>
+
+                <div class="text-center pt-2">
+                    <button onclick="volverAlLogin()" class="text-xs text-slate-500 dark:text-slate-400 hover:underline">Volver al Iniciar Sesión</button>
+                </div>
+            </div>
+
+            <p id="auth-msg" class="text-center text-sm mt-4 font-medium"></p>
+        </div>
+
+        <!-- VISTA 2: DASHBOARD PRINCIPAL (MAPA CARTO + ZONAS) -->
+        <div id="dashboard-container" class="hidden w-full max-w-7xl bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-10">
+            <div class="flex flex-wrap justify-between items-center gap-3 mb-6 border-b dark:border-slate-700 pb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800 dark:text-white">Panel de Control - Monitoreo Goya</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Estado territorial y zonas vulnerables activas</p>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button id="admin-panel-button" onclick="mostrarPanelRelevamientos()" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm transition-colors shadow-md">
+                        Panel de relevamientos
+                    </button>
+                    <button onclick="cerrarSesion()" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm transition-colors shadow-md">
+                        Cerrar Sesión
+                    </button>
+                </div>
+            </div>
+
+            <div id="dashboard-main-view" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Contenedor del Mapa -->
+                <div class="lg:col-span-2 h-[500px] bg-slate-200 dark:bg-slate-700 rounded-xl overflow-hidden shadow-inner" id="map"></div>
+
+                <!-- Panel de Datos y Zonas Vulnerables -->
+                <div class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border dark:border-slate-600 flex flex-col justify-between h-[500px]">
+                    <div>
+                        <h3 class="font-bold text-slate-700 dark:text-slate-200 mb-3 text-lg border-b dark:border-slate-600 pb-2">Zonas de Riesgo Monitoreadas</h3>
+                        <div class="space-y-3 overflow-y-auto max-h-[380px] pr-1">
+                            <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-600 shadow-sm">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-semibold text-slate-800 dark:text-white text-sm">Zona Puerto / Costanera</span>
+                                    <span class="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full font-medium">Alerta Media</span>
+                                </div>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Nivel del río en constante observación por crecida.</p>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-600 shadow-sm">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-semibold text-slate-800 dark:text-white text-sm">B° Matadero / Riacho Goya</span>
+                                    <span class="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 text-xs px-2 py-0.5 rounded-full font-medium">Crítico</span>
+                                </div>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Monitoreo de familias afectadas por desborde.</p>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-600 shadow-sm">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-semibold text-slate-800 dark:text-white text-sm">Zona Paraje El Bajo</span>
+                                    <span class="bg-emerald-100 text-emerald-800 dark:text-emerald-900/50 dark:text-emerald-300 text-xs px-2 py-0.5 rounded-full font-medium">Estable</span>
+                                </div>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Caminos transitables, sin reporte de ingresos de agua.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center pt-2 border-t dark:border-slate-600">
+                        <span class="text-xs text-slate-400">Sistema Activo - Goya, Corrientes</span>
+                    </div>
+                </div>
+            </div>
+
+            <section id="admin-reports-panel" class="hidden">
+                            <div class="flex flex-wrap justify-between items-center gap-3 mb-5">
+                                <div>
+                                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">Panel de relevamientos</h3>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">Reportes de campo registrados en Goya</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="exportarRelevamientos()" class="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-lg text-sm">Exportar CSV</button>
+                                    <button onclick="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm">Imprimir / PDF</button>
+                                    <button onclick="volverDashboardPrincipal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm">Volver al mapa</button>
+                                </div>
+                            </div>
+
+                            <p id="reports-message" role="status" class="text-sm mb-3"></p>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                                <article class="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border dark:border-slate-600">
+                                    <p class="text-sm text-slate-500 dark:text-slate-300">Reportes en la selección</p>
+                                    <p id="reports-total" class="text-2xl font-bold text-slate-800 dark:text-white">0</p>
+                                </article>
+                                <article class="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border dark:border-slate-600">
+                                    <p class="text-sm text-slate-500 dark:text-slate-300">Sobre umbral automático</p>
+                                    <p id="reports-critical" class="text-2xl font-bold text-red-600">0</p>
+                                </article>
+                                <article class="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border dark:border-slate-600">
+                                    <p class="text-sm text-slate-500 dark:text-slate-300">Personas afectadas reportadas</p>
+                                    <p id="reports-people" class="text-2xl font-bold text-slate-800 dark:text-white">0</p>
+                                </article>
+                            </div>
+
+                            <section id="reports-filter-section" class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border dark:border-slate-600 mb-5">
+                                <h4 class="font-bold text-slate-800 dark:text-white mb-3">Filtrar reportes</h4>
+                                <form id="reports-filter-form" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                                    <label class="text-sm text-slate-700 dark:text-slate-200">Barrio
+                                        <input name="barrio" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2" placeholder="Todos">
+                                    </label>
+                                    <label class="text-sm text-slate-700 dark:text-slate-200">Desde
+                                        <input name="desde" type="date" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                    </label>
+                                    <label class="text-sm text-slate-700 dark:text-slate-200">Hasta
+                                        <input name="hasta" type="date" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                    </label>
+                                    <label class="text-sm text-slate-700 dark:text-slate-200">Clasificación automática
+                                        <select name="riesgo" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                            <option value="">Todas</option>
+                                            <option value="critico">Sobre el umbral (≥ 5,20 m)</option>
+                                            <option value="sin-alerta">Sin alerta automática</option>
+                                        </select>
+                                    </label>
+                                    <button class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-2">Aplicar filtros</button>
+                                </form>
+                            </section>
+
+                            <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                                <section class="xl:col-span-2 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border dark:border-slate-600">
+                                    <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
+                                        <h4 class="font-bold text-slate-800 dark:text-white">Mapa de reportes</h4>
+                                        <span class="text-xs text-slate-500 dark:text-slate-300">Rojo: sobre umbral · Verde: sin alerta automática</span>
+                                    </div>
+                                    <div id="reports-map" class="h-[480px] rounded-lg overflow-hidden bg-slate-200"></div>
+                                    <p class="text-xs text-slate-500 dark:text-slate-300 mt-2">Haz clic en el mapa para seleccionar la ubicación del reporte.</p>
+                                </section>
+
+                                <section id="new-report-section" class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border dark:border-slate-600">
+                                    <h4 class="font-bold text-slate-800 dark:text-white mb-3">Nuevo relevamiento</h4>
+                                    <form id="new-report-form" class="space-y-3">
+                                        <label class="block text-sm text-slate-700 dark:text-slate-200">Barrio o zona
+                                            <input name="barrio" required maxlength="120" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                        </label>
+                                        <label class="block text-sm text-slate-700 dark:text-slate-200">Nivel del río (m)
+                                            <input name="nivelRioParana" type="number" min="0" step="0.01" required class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                        </label>
+                                        <label class="block text-sm text-slate-700 dark:text-slate-200">Personas afectadas
+                                            <input name="personasAfectadas" type="number" min="0" step="1" value="0" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                        </label>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <label class="block text-sm text-slate-700 dark:text-slate-200">Latitud
+                                                <input name="lat" type="number" min="-29.5" max="-29" step="0.000001" required class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                            </label>
+                                            <label class="block text-sm text-slate-700 dark:text-slate-200">Longitud
+                                                <input name="lng" type="number" min="-59.5" max="-59" step="0.000001" required class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                            </label>
+                                        </div>
+                                        <label class="block text-sm text-slate-700 dark:text-slate-200">Necesidades informadas
+                                            <textarea name="necesidades" maxlength="1000" rows="2" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2"></textarea>
+                                        </label>
+                                        <label class="block text-sm text-slate-700 dark:text-slate-200">Observaciones
+                                            <textarea name="observaciones" maxlength="2000" rows="2" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2"></textarea>
+                                        </label>
+                                        <button class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-2 font-semibold">Guardar reporte</button>
+                                    </form>
+                                    <p class="text-xs text-slate-500 dark:text-slate-300 mt-3">La clasificación usa el umbral del proyecto (5,20 m); no constituye una alerta oficial.</p>
+                                </section>
+                            </div>
+
+                            <section class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border dark:border-slate-600 mt-5">
+                                <div class="flex flex-wrap justify-between items-center gap-2 mb-3">
+                                    <h4 class="font-bold text-slate-800 dark:text-white">Reportes</h4>
+                                    <span id="reports-last" class="text-xs text-slate-500 dark:text-slate-300"></span>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm text-left text-slate-700 dark:text-slate-200">
+                                        <thead><tr class="border-b dark:border-slate-600">
+                                            <th class="p-2">Fecha</th><th class="p-2">Zona</th><th class="p-2">Río</th>
+                                            <th class="p-2">Personas</th><th class="p-2">Estado</th><th class="p-2">Responsable</th>
+                                        </tr></thead>
+                                        <tbody id="reports-rows"></tbody>
+                                    </table>
+                                </div>
+                                <p id="reports-count" class="text-xs text-slate-500 dark:text-slate-300 mt-2"></p>
+                            </section>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API_URL = window.location.protocol === 'file:'
+            ? 'http://localhost:5000'
+            : window.location.origin;
+
+        let mapInstance = null;
+        let tileLayer = null;
+        let currentUser = null;
+        let reportsMap = null;
+        let reportsMarkerLayer = null;
+        let selectedReportMarker = null;
+
+        const reportsApi = async (path, options = {}) => {
+            const response = await fetch(`${API_URL}/api/relevamientos${path}`, {
+                ...options,
+                headers: {
+                    ...(options.headers || {}),
+                    Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    ...(options.body ? { 'Content-Type': 'application/json' } : {})
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.status === 401) {
+                cerrarSesion();
+                throw new Error(data.mensaje || 'La sesión expiró. Inicia sesión nuevamente.');
+            }
+            if (!response.ok) throw new Error(data.mensaje || 'No se pudo completar la operación.');
+            return data;
+        };
+
+        const reportsFiltersQuery = () => {
+            const params = new URLSearchParams(new FormData(document.getElementById('reports-filter-form')));
+            for (const [key, value] of [...params.entries()]) {
+                if (!value) params.delete(key);
+            }
+            return params.size ? `?${params}` : '';
+        };
+
+        const escapeReportHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[character]);
+
+        const formatReportDate = (date) => date ? new Date(date).toLocaleString('es-AR') : '—';
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const themeIcon = document.getElementById('theme-icon');
+            
+            html.classList.toggle('dark');
+            if (html.classList.contains('dark')) {
+                themeIcon.innerText = "☀️";
+                localStorage.setItem('theme', 'dark');
+                setMapTheme('dark');
+            } else {
+                themeIcon.innerText = "🌙";
+                localStorage.setItem('theme', 'light');
+                setMapTheme('light');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('theme') === 'dark') {
+                document.documentElement.classList.add('dark');
+                document.getElementById('theme-icon').innerText = "☀️";
+            }
+        });
+
+        function setMapTheme(theme) {
+            if (!mapInstance) return;
+            if (tileLayer) mapInstance.removeLayer(tileLayer);
+
+            const tileUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+
+            tileLayer = L.tileLayer(tileUrl, {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>'
+            }).addTo(mapInstance);
+        }
+
+        function switchTab(tab) {
+            const loginTab = document.getElementById('tab-login');
+            const registerTab = document.getElementById('tab-register');
+            const formLogin = document.getElementById('form-login');
+            const formRegister = document.getElementById('form-register');
+            const formRecovery = document.getElementById('form-recovery');
+            const authTabs = document.getElementById('auth-tabs');
+            const msg = document.getElementById('auth-msg');
+            msg.innerText = '';
+            formRecovery.classList.add('hidden');
+            authTabs.classList.remove('hidden');
+
+            if (tab === 'login') {
+                loginTab.className = "flex-1 pb-2 font-semibold text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 transition-all";
+                registerTab.className = "flex-1 pb-2 font-semibold text-slate-400 dark:text-slate-500 hover:text-slate-600 transition-all";
+                formLogin.classList.remove('hidden');
+                formRegister.classList.add('hidden');
+            } else {
+                registerTab.className = "flex-1 pb-2 font-semibold text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 transition-all";
+                loginTab.className = "flex-1 pb-2 font-semibold text-slate-400 dark:text-slate-500 hover:text-slate-600 transition-all";
+                formRegister.classList.remove('hidden');
+                formLogin.classList.add('hidden');
+            }
+        }
+
+        function mostrarSeccionRecuperar() {
+            document.getElementById('form-login').classList.add('hidden');
+            document.getElementById('auth-tabs').classList.add('hidden');
+            document.getElementById('form-recovery').classList.remove('hidden');
+            document.getElementById('auth-msg').innerText = '';
+        }
+
+        function volverAlLogin() {
+            document.getElementById('form-recovery').classList.add('hidden');
+            document.getElementById('auth-tabs').classList.remove('hidden');
+            document.getElementById('form-login').classList.remove('hidden');
+            document.getElementById('auth-msg').innerText = '';
+        }
+
+        async function iniciarSesion() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const msg = document.getElementById('auth-msg');
+
+            if (!email || !password) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "Completa todos los campos.";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('token', data.token);
+                    currentUser = data.usuario || null;
+                    mostrarDashboard();
+                } else {
+                    msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                    msg.innerText = data.mensaje || "Credenciales incorrectas.";
+                }
+            } catch (error) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "No se pudo conectar con el servidor. Verifica que esté iniciado con npm run dev.";
+            }
+        }
+
+        async function registrarUsuario() {
+            const nombre = document.getElementById('reg-nombre').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const msg = document.getElementById('auth-msg');
+
+            if (!nombre || !email || !password) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "Completa todos los campos.";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/registrar`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, email, password })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    msg.className = "text-center text-sm mt-4 font-medium text-emerald-600";
+                    msg.innerText = "¡Cuenta creada con éxito! Ya puedes iniciar sesión.";
+                    setTimeout(() => switchTab('login'), 2000);
+                } else {
+                    msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                    msg.innerText = data.mensaje || "Error en el registro.";
+                }
+            } catch (error) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "Error de conexión con el servidor.";
+            }
+        }
+
+        async function solicitarTokenRecuperacion() {
+            const email = document.getElementById('rec-email').value;
+            const msg = document.getElementById('auth-msg');
+
+            if (!email) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "Ingresa tu correo electrónico.";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/solicitar-codigo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    msg.className = "text-center text-sm mt-4 font-medium text-emerald-600";
+                    msg.innerText = "¡Código enviado! Revisa tu correo.";
+                    document.getElementById('recovery-token-section').classList.remove('hidden');
+                } else {
+                    msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                    msg.innerText = data.mensaje || "El correo no está registrado.";
+                }
+            } catch (error) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "Error de conexión con el servidor.";
+            }
+        }
+
+        async function verificarYCambiarPassword() {
+            const email = document.getElementById('rec-email').value;
+            const token = document.getElementById('rec-code').value;
+            const newPassword = document.getElementById('rec-new-password').value;
+            const msg = document.getElementById('auth-msg');
+
+            if (!token || !newPassword) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "Completa el código y la nueva contraseña.";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/auth/verificar-codigo`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, token, newPassword })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    msg.className = "text-center text-sm mt-4 font-medium text-emerald-600";
+                    msg.innerText = "¡Contraseña actualizada con éxito!";
+                    setTimeout(() => { volverAlLogin(); switchTab('login'); }, 2000);
+                } else {
+                    msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                    msg.innerText = data.mensaje || "Código inválido.";
+                }
+            } catch (error) {
+                msg.className = "text-center text-sm mt-4 font-medium text-red-500";
+                msg.innerText = "Error al restablecer la contraseña.";
+            }
+        }
+
+        function mostrarMensajeRelevamientos(texto, error = false) {
+            const mensaje = document.getElementById('reports-message');
+            mensaje.textContent = texto;
+            mensaje.className = `text-sm mb-3 ${error ? 'text-red-500' : 'text-emerald-600'}`;
+        }
+
+        function inicializarMapaRelevamientos() {
+            if (reportsMap) {
+                reportsMap.invalidateSize();
+                return;
+            }
+
+            reportsMap = L.map('reports-map').setView([-29.1425077, -59.2719217], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(reportsMap);
+            reportsMarkerLayer = L.layerGroup().addTo(reportsMap);
+
+            reportsMap.on('click', (event) => {
+                const { lat, lng } = event.latlng;
+                if (lat < -29.5 || lat > -29 || lng < -59.5 || lng > -59) {
+                    mostrarMensajeRelevamientos('Selecciona una ubicación dentro del área de Goya.', true);
+                    return;
+                }
+
+                document.querySelector('#new-report-form [name="lat"]').value = lat.toFixed(6);
+                document.querySelector('#new-report-form [name="lng"]').value = lng.toFixed(6);
+                if (selectedReportMarker) selectedReportMarker.setLatLng([lat, lng]);
+                else {
+                    selectedReportMarker = L.marker([lat, lng])
+                        .addTo(reportsMap)
+                        .bindPopup('Ubicación del nuevo reporte');
+                }
+                selectedReportMarker.openPopup();
+                mostrarMensajeRelevamientos('Ubicación seleccionada. Completa el formulario para guardar.');
+            });
+        }
+
+        function enfocarRelevamiento(relevamiento) {
+            const punto = [relevamiento.coordenadas.lat, relevamiento.coordenadas.lng];
+            reportsMap.setView(punto, 16);
+            const marcador = reportsMarkerLayer.getLayers()
+                .find((layer) => layer.relevamientoId === relevamiento._id);
+            if (marcador) marcador.openPopup();
+        }
+
+        function mostrarRelevamientos(relevamientos) {
+            reportsMarkerLayer.clearLayers();
+            const filas = document.getElementById('reports-rows');
+            filas.replaceChildren();
+
+            relevamientos.forEach((relevamiento) => {
+                const critico = relevamiento.estadoEvacuacion;
+                const marcador = L.circleMarker(
+                    [relevamiento.coordenadas.lat, relevamiento.coordenadas.lng],
+                    {
+                        radius: 9,
+                        color: critico ? '#991b1b' : '#166534',
+                        fillColor: critico ? '#ef4444' : '#22c55e',
+                        fillOpacity: 0.85
+                    }
+                ).addTo(reportsMarkerLayer);
+                marcador.relevamientoId = relevamiento._id;
+                marcador.bindPopup(
+                    `<strong>${escapeReportHtml(relevamiento.barrio)}</strong><br>` +
+                    `Nivel: ${escapeReportHtml(relevamiento.nivelRioParana)} m<br>` +
+                    `Personas reportadas: ${escapeReportHtml(relevamiento.personasAfectadas || 0)}<br>` +
+                    `${critico ? 'Sobre el umbral automático (5,20 m)' : 'Sin alerta automática'}<br>` +
+                    `Fecha: ${escapeReportHtml(formatReportDate(relevamiento.fechaRegistro))}`
+                );
+
+                const fila = document.createElement('tr');
+                fila.className = 'border-b border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer';
+                fila.title = 'Centrar el mapa en este reporte';
+                [
+                    formatReportDate(relevamiento.fechaRegistro),
+                    relevamiento.barrio,
+                    `${relevamiento.nivelRioParana} m`,
+                    relevamiento.personasAfectadas || 0,
+                    critico ? 'Sobre el umbral' : 'Sin alerta automática',
+                    relevamiento.registradoPor?.nombre || relevamiento.registradoPor?.email || '—'
+                ].forEach((valor) => {
+                    const celda = document.createElement('td');
+                    celda.className = 'p-2';
+                    celda.textContent = valor;
+                    fila.appendChild(celda);
+                });
+                fila.addEventListener('click', () => enfocarRelevamiento(relevamiento));
+                filas.appendChild(fila);
+            });
+
+            document.getElementById('reports-count').textContent = relevamientos.length === 500
+                ? 'Se muestran hasta 500 reportes. Exporta el CSV para obtener todos los resultados.'
+                : `${relevamientos.length} reporte(s) en la selección.`;
+        }
+
+        async function actualizarPanelRelevamientos() {
+            try {
+                const query = reportsFiltersQuery();
+                const [relevamientos, resumen] = await Promise.all([
+                    reportsApi(query),
+                    reportsApi(`/resumen${query}`)
+                ]);
+                mostrarRelevamientos(relevamientos);
+                document.getElementById('reports-total').textContent = resumen.total;
+                document.getElementById('reports-critical').textContent = resumen.criticos;
+                document.getElementById('reports-people').textContent = resumen.personasAfectadas;
+                document.getElementById('reports-last').textContent = resumen.ultimo
+                    ? `Último reporte: ${resumen.ultimo.barrio}, ${formatReportDate(resumen.ultimo.fechaRegistro)}`
+                    : 'Todavía no hay reportes.';
+                mostrarMensajeRelevamientos('Datos actualizados.');
+            } catch (error) {
+                mostrarMensajeRelevamientos(error.message, true);
+            }
+        }
+
+        function mostrarPanelRelevamientos() {
+            if (currentUser?.rol !== 'admin') return;
+            document.getElementById('dashboard-main-view').classList.add('hidden');
+            document.getElementById('admin-reports-panel').classList.remove('hidden');
+            setTimeout(() => {
+                inicializarMapaRelevamientos();
+                actualizarPanelRelevamientos();
+            }, 100);
+        }
+
+        function volverDashboardPrincipal() {
+            document.getElementById('admin-reports-panel').classList.add('hidden');
+            document.getElementById('dashboard-main-view').classList.remove('hidden');
+            if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 100);
+        }
+
+        async function exportarRelevamientos() {
+            try {
+                const response = await fetch(
+                    `${API_URL}/api/relevamientos/exportar.csv${reportsFiltersQuery()}`,
+                    { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+                );
+                if (response.status === 401) {
+                    cerrarSesion();
+                    throw new Error('La sesión expiró. Inicia sesión nuevamente.');
+                }
+                if (!response.ok) {
+                    const data = await response.json().catch(() => ({}));
+                    throw new Error(data.mensaje || 'No se pudo exportar el CSV.');
+                }
+
+                const url = URL.createObjectURL(await response.blob());
+                const enlace = document.createElement('a');
+                enlace.href = url;
+                enlace.download = 'relevamientos.csv';
+                enlace.click();
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                mostrarMensajeRelevamientos(error.message, true);
+            }
+        }
+
+        document.getElementById('reports-filter-form').addEventListener('submit', (event) => {
+            event.preventDefault();
+            actualizarPanelRelevamientos();
+        });
+
+        document.getElementById('new-report-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const campos = new FormData(form);
+
+            try {
+                const resultado = await reportsApi('', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        barrio: campos.get('barrio'),
+                        nivelRioParana: Number(campos.get('nivelRioParana')),
+                        personasAfectadas: Number(campos.get('personasAfectadas') || 0),
+                        necesidades: campos.get('necesidades'),
+                        observaciones: campos.get('observaciones'),
+                        coordenadas: {
+                            lat: Number(campos.get('lat')),
+                            lng: Number(campos.get('lng'))
+                        }
+                    })
+                });
+                form.reset();
+                if (selectedReportMarker) {
+                    reportsMap.removeLayer(selectedReportMarker);
+                    selectedReportMarker = null;
+                }
+                mostrarMensajeRelevamientos(resultado.mensaje);
+                await actualizarPanelRelevamientos();
+            } catch (error) {
+                mostrarMensajeRelevamientos(error.message, true);
+            }
+        });
+
+        function mostrarDashboard() {
+            document.getElementById('auth-container').classList.add('hidden');
+            document.getElementById('bg-hero').classList.add('hidden');
+            document.getElementById('dashboard-container').classList.remove('hidden');
+            document.getElementById('admin-panel-button').classList.toggle('hidden', currentUser?.rol !== 'admin');
+            volverDashboardPrincipal();
+            
+            setTimeout(() => {
+                if (!mapInstance) {
+                    mapInstance = L.map('map').setView([-29.1425077, -59.2719217], 13);
+                    
+                    const isDark = document.documentElement.classList.contains('dark');
+                    setMapTheme(isDark ? 'dark' : 'light');
+
+                    L.marker([-29.1425077, -59.2719217]).addTo(mapInstance)
+                        .bindPopup('<b>Monitoreo Goya</b><br/>Zona Costera / Puerto.')
+                        .openPopup();
+                } else {
+                    mapInstance.invalidateSize();
+                }
+            }, 300);
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('token');
+            currentUser = null;
+            location.reload();
+        }
+    </script>
+</body>
+</html>
