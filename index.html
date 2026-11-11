@@ -13,6 +13,104 @@
     </script>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        @media print {
+            @page {
+                size: landscape;
+                margin: 14mm;
+            }
+
+            body.report-print-mode > :not(main) {
+                display: none !important;
+            }
+
+            body.report-print-mode > main {
+                display: block !important;
+                min-height: 0;
+                padding: 0 !important;
+            }
+
+            body.report-print-mode > main > :not(#dashboard-container),
+            body.report-print-mode #dashboard-container > :not(#report-print-view) {
+                display: none !important;
+            }
+
+            body.report-print-mode #dashboard-container {
+                display: block !important;
+                max-width: none;
+                padding: 0;
+                border: 0;
+                box-shadow: none;
+            }
+
+            body.report-print-mode #report-print-view {
+                display: block !important;
+                color: #0f172a;
+                font-family: Arial, sans-serif;
+            }
+
+            #report-print-view h1 {
+                margin: 0;
+                font-size: 24pt;
+            }
+
+            #report-print-view h2 {
+                margin: 16pt 0 6pt;
+                font-size: 13pt;
+            }
+
+            #report-print-view .report-summary-grid {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 8pt;
+                margin: 12pt 0;
+            }
+
+            #report-print-view .report-summary-card {
+                padding: 8pt;
+                border: 1px solid #cbd5e1;
+                border-radius: 6pt;
+            }
+
+            #report-print-view .report-summary-card strong {
+                display: block;
+                font-size: 18pt;
+            }
+
+            #report-print-view table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 8pt;
+            }
+
+            #report-print-view th,
+            #report-print-view td {
+                padding: 5pt;
+                border: 1px solid #cbd5e1;
+                text-align: left;
+                vertical-align: top;
+                overflow-wrap: anywhere;
+            }
+
+            #report-print-view th {
+                background: #e2e8f0 !important;
+                print-color-adjust: exact;
+            }
+
+            #report-print-view thead {
+                display: table-header-group;
+            }
+
+            #report-print-view tr {
+                break-inside: avoid;
+            }
+
+            #report-print-view .report-note {
+                margin-top: 12pt;
+                font-size: 8pt;
+            }
+        }
+    </style>
 </head>
 <body class="bg-slate-100 dark:bg-slate-900 min-h-screen flex flex-col justify-between transition-colors duration-300 relative">
 
@@ -129,6 +227,21 @@
                 </div>
             </div>
 
+            <section id="river-status-card" class="mb-6 rounded-xl border border-sky-200 bg-sky-50 p-4 dark:border-sky-900 dark:bg-slate-700/60" aria-labelledby="river-status-title" aria-live="polite">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h3 id="river-status-title" class="font-bold text-slate-800 dark:text-white">Río Paraná · Estación Goya</h3>
+                        <p id="river-status-message" class="text-sm text-slate-600 dark:text-slate-300">Consultando la última medición disponible…</p>
+                    </div>
+                    <div class="text-left sm:text-right">
+                        <p id="river-height" class="text-2xl font-bold text-slate-800 dark:text-white">—</p>
+                        <p id="river-pna-status" class="text-sm font-semibold text-slate-600 dark:text-slate-300"></p>
+                    </div>
+                </div>
+                <p id="river-sync-warning" class="hidden mt-2 text-sm text-amber-700 dark:text-amber-300"></p>
+                <p id="river-source-details" class="mt-2 text-xs text-slate-500 dark:text-slate-400"></p>
+            </section>
+
             <div id="dashboard-main-view" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Contenedor del Mapa -->
                 <div class="lg:col-span-2 h-[500px] bg-slate-200 dark:bg-slate-700 rounded-xl overflow-hidden shadow-inner" id="map"></div>
@@ -175,7 +288,7 @@
                                 </div>
                                 <div class="flex gap-2">
                                     <button onclick="exportarRelevamientos()" class="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-lg text-sm">Exportar CSV</button>
-                                    <button onclick="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm">Imprimir / PDF</button>
+                                    <button id="generate-report-button" onclick="elaborarInforme()" aria-label="Elaborar informe e imprimirlo o guardarlo como PDF" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-2 rounded-lg text-sm">Elaborar informe</button>
                                     <button onclick="volverDashboardPrincipal()" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm">Volver al mapa</button>
                                 </div>
                             </div>
@@ -232,7 +345,8 @@
 
                                 <section id="new-report-section" class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border dark:border-slate-600">
                                     <h4 class="font-bold text-slate-800 dark:text-white mb-3">Nuevo relevamiento</h4>
-                                    <form id="new-report-form" class="space-y-3">
+                                                    <p class="text-xs text-slate-500 dark:text-slate-300 mb-3">Puedes escribir un barrio nuevo; el nombre se guarda con el relevamiento. Selecciona también su ubicación en el mapa.</p>
+                                                    <form id="new-report-form" class="space-y-3">
                                         <label class="block text-sm text-slate-700 dark:text-slate-200">Barrio o zona
                                             <input name="barrio" required maxlength="120" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
                                         </label>
@@ -279,6 +393,53 @@
                                 <p id="reports-count" class="text-xs text-slate-500 dark:text-slate-300 mt-2"></p>
                             </section>
             </section>
+
+            <section id="report-print-view" class="hidden" aria-hidden="true">
+                <header>
+                    <h1>Informe de relevamientos territoriales</h1>
+                    <p>Monitoreo Territorial · Goya, Corrientes</p>
+                    <p>Fecha de elaboración: <time id="report-generated-at"></time></p>
+                </header>
+
+                <section aria-label="Resumen del período">
+                    <h2>Resumen de resultados</h2>
+                    <div class="report-summary-grid">
+                        <div class="report-summary-card">Reportes registrados<strong id="report-total">0</strong></div>
+                        <div class="report-summary-card">Sobre umbral automático<strong id="report-critical">0</strong></div>
+                        <div class="report-summary-card">Personas afectadas reportadas<strong id="report-people">0</strong></div>
+                    </div>
+                    <p id="report-summary-text"></p>
+                </section>
+
+                <section aria-label="Filtros aplicados">
+                    <h2>Criterios de selección</h2>
+                    <p id="report-filters-summary"></p>
+                </section>
+
+                <section aria-label="Detalle de relevamientos">
+                    <h2>Detalle de relevamientos</h2>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Zona</th>
+                                <th>Nivel del río</th>
+                                <th>Personas</th>
+                                <th>Clasificación</th>
+                                <th>Necesidades</th>
+                                <th>Observaciones</th>
+                                <th>Responsable</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-rows"></tbody>
+                    </table>
+                    <p id="report-count-note" class="report-note"></p>
+                </section>
+
+                <footer class="report-note">
+                    Clasificación automática conforme al umbral de 5,20 m definido por el proyecto; no constituye una alerta oficial.
+                </footer>
+            </section>
         </div>
 
     </main>
@@ -296,6 +457,8 @@
         let reportsMap = null;
         let reportsMarkerLayer = null;
         let selectedReportMarker = null;
+        let riverStatusTimer = null;
+        let riverStatusRequest = null;
 
         const reportsApi = async (path, options = {}) => {
             const response = await fetch(`${API_URL}/api/relevamientos${path}`, {
@@ -308,12 +471,80 @@
             });
             const data = await response.json().catch(() => ({}));
             if (response.status === 401) {
-                cerrarSesion();
-                throw new Error(data.mensaje || 'La sesión expiró. Inicia sesión nuevamente.');
+                const mensajeSesion = data.mensaje || 'La sesión expiró. Inicia sesión nuevamente.';
+                cerrarSesion(mensajeSesion);
+                throw new Error(mensajeSesion);
             }
-            if (!response.ok) throw new Error(data.mensaje || 'No se pudo completar la operación.');
+            if (!response.ok) {
+                const detalleValidacion = data.errores
+                    ?.map((error) => error.msg)
+                    .filter(Boolean)
+                    .join(' ');
+                throw new Error(data.mensaje || detalleValidacion || 'No se pudo completar la operación.');
+            }
             return data;
         };
+
+        async function actualizarEstadoRio() {
+            if (riverStatusRequest) return riverStatusRequest;
+
+            riverStatusRequest = (async () => {
+                const mensaje = document.getElementById('river-status-message');
+                const altura = document.getElementById('river-height');
+                const estado = document.getElementById('river-pna-status');
+                const detalles = document.getElementById('river-source-details');
+                const advertencia = document.getElementById('river-sync-warning');
+                try {
+                    const response = await fetch(`${API_URL}/api/rio`, {
+                        headers: { Authorization: `******'token')}` }
+                    });
+                    const data = await response.json().catch(() => ({}));
+                    if (response.status === 401) {
+                        const mensajeSesion = data.mensaje || 'La sesión expiró. Inicia sesión nuevamente.';
+                        cerrarSesion(mensajeSesion);
+                        throw new Error(mensajeSesion);
+                    }
+                    if (!response.ok) throw new Error(data.mensaje || 'No se pudo consultar la medición del río.');
+
+                    const medicion = data.medicion;
+                    altura.textContent = `${Number(medicion.alturaMetros).toLocaleString('es-AR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    })} m`;
+                    estado.textContent = medicion.estado || '';
+                    estado.className = /EVACUACION|ALERTA/i.test(medicion.estado || '')
+                        ? 'text-sm font-bold text-red-700 dark:text-red-300'
+                        : 'text-sm font-semibold text-slate-600 dark:text-slate-300';
+                    mensaje.textContent = `Última medición informada por Prefectura: ${medicion.fechaMedicionOrigen}.`;
+                    detalles.textContent =
+                        `Río ${medicion.rio} · Período informado por Prefectura: ${medicion.periodoHoras ?? '—'} h · ` +
+                        `Consulta del sistema cada ${data.sincronizacion.intervaloMinutos} min. ` +
+                        'La fuente no especifica zona horaria para la medición. ';
+                    const enlaceFuente = document.createElement('a');
+                    enlaceFuente.href = data.sincronizacion.fuente;
+                    enlaceFuente.target = '_blank';
+                    enlaceFuente.rel = 'noopener noreferrer';
+                    enlaceFuente.textContent = 'Fuente: Prefectura Naval Argentina';
+                    enlaceFuente.className = 'underline';
+                    detalles.appendChild(enlaceFuente);
+
+                    advertencia.textContent = data.sincronizacion.ultimoError
+                        ? `No se pudo actualizar la fuente: ${data.sincronizacion.ultimoError}. Se muestra la última medición guardada.`
+                        : '';
+                    advertencia.classList.toggle('hidden', !data.sincronizacion.ultimoError);
+                } catch (error) {
+                    altura.textContent = '—';
+                    estado.textContent = '';
+                    mensaje.textContent = error.message;
+                    detalles.textContent = 'Fuente: Prefectura Naval Argentina. No hay una medición guardada disponible.';
+                    advertencia.classList.add('hidden');
+                } finally {
+                    riverStatusRequest = null;
+                }
+            })();
+
+            return riverStatusRequest;
+        }
 
         const reportsFiltersQuery = () => {
             const params = new URLSearchParams(new FormData(document.getElementById('reports-filter-form')));
@@ -587,30 +818,44 @@
             reportsMarkerLayer.clearLayers();
             const filas = document.getElementById('reports-rows');
             filas.replaceChildren();
+            let sinCoordenadas = 0;
 
             relevamientos.forEach((relevamiento) => {
                 const critico = relevamiento.estadoEvacuacion;
-                const marcador = L.circleMarker(
-                    [relevamiento.coordenadas.lat, relevamiento.coordenadas.lng],
-                    {
-                        radius: 9,
-                        color: critico ? '#991b1b' : '#166534',
-                        fillColor: critico ? '#ef4444' : '#22c55e',
-                        fillOpacity: 0.85
-                    }
-                ).addTo(reportsMarkerLayer);
-                marcador.relevamientoId = relevamiento._id;
-                marcador.bindPopup(
-                    `<strong>${escapeReportHtml(relevamiento.barrio)}</strong><br>` +
-                    `Nivel: ${escapeReportHtml(relevamiento.nivelRioParana)} m<br>` +
-                    `Personas reportadas: ${escapeReportHtml(relevamiento.personasAfectadas || 0)}<br>` +
-                    `${critico ? 'Sobre el umbral automático (5,20 m)' : 'Sin alerta automática'}<br>` +
-                    `Fecha: ${escapeReportHtml(formatReportDate(relevamiento.fechaRegistro))}`
-                );
+                const lat = Number(relevamiento.coordenadas?.lat);
+                const lng = Number(relevamiento.coordenadas?.lng);
+                const coordenadasValidas = Number.isFinite(lat) && Number.isFinite(lng) &&
+                    lat >= -29.5 && lat <= -29 && lng >= -59.5 && lng <= -59;
+
+                if (coordenadasValidas) {
+                    const marcador = L.circleMarker(
+                        [lat, lng],
+                        {
+                            radius: 9,
+                            color: critico ? '#991b1b' : '#166534',
+                            fillColor: critico ? '#ef4444' : '#22c55e',
+                            fillOpacity: 0.85
+                        }
+                    ).addTo(reportsMarkerLayer);
+                    marcador.relevamientoId = relevamiento._id;
+                    marcador.bindPopup(
+                        `<strong>${escapeReportHtml(relevamiento.barrio)}</strong><br>` +
+                        `Nivel: ${escapeReportHtml(relevamiento.nivelRioParana)} m<br>` +
+                        `Personas reportadas: ${escapeReportHtml(relevamiento.personasAfectadas || 0)}<br>` +
+                        `${critico ? 'Sobre el umbral automático (5,20 m)' : 'Sin alerta automática'}<br>` +
+                        `Fecha: ${escapeReportHtml(formatReportDate(relevamiento.fechaRegistro))}`
+                    );
+                } else {
+                    sinCoordenadas += 1;
+                }
 
                 const fila = document.createElement('tr');
-                fila.className = 'border-b border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-slate-700 cursor-pointer';
-                fila.title = 'Centrar el mapa en este reporte';
+                fila.className = 'border-b border-slate-200 dark:border-slate-600';
+                if (coordenadasValidas) {
+                    fila.classList.add('hover:bg-blue-50', 'dark:hover:bg-slate-700', 'cursor-pointer');
+                    fila.title = 'Centrar el mapa en este reporte';
+                    fila.addEventListener('click', () => enfocarRelevamiento(relevamiento));
+                }
                 [
                     formatReportDate(relevamiento.fechaRegistro),
                     relevamiento.barrio,
@@ -624,13 +869,16 @@
                     celda.textContent = valor;
                     fila.appendChild(celda);
                 });
-                fila.addEventListener('click', () => enfocarRelevamiento(relevamiento));
                 filas.appendChild(fila);
             });
 
-            document.getElementById('reports-count').textContent = relevamientos.length === 500
+            const mensajes = [relevamientos.length === 500
                 ? 'Se muestran hasta 500 reportes. Exporta el CSV para obtener todos los resultados.'
-                : `${relevamientos.length} reporte(s) en la selección.`;
+                : `${relevamientos.length} reporte(s) en la selección.`];
+            if (sinCoordenadas) {
+                mensajes.push(`${sinCoordenadas} sin coordenadas válidas; se muestran en la tabla, pero no en el mapa.`);
+            }
+            document.getElementById('reports-count').textContent = mensajes.join(' ');
         }
 
         async function actualizarPanelRelevamientos() {
@@ -650,6 +898,110 @@
                 mostrarMensajeRelevamientos('Datos actualizados.');
             } catch (error) {
                 mostrarMensajeRelevamientos(error.message, true);
+            }
+        }
+
+        function completarInformeRelevamientos(relevamientos, resumen) {
+            const fechaElaboracion = new Date();
+            const fechaInforme = document.getElementById('report-generated-at');
+            fechaInforme.textContent = fechaElaboracion.toLocaleString('es-AR');
+            fechaInforme.dateTime = fechaElaboracion.toISOString();
+
+            const total = Number(resumen.total || 0);
+            const criticos = Number(resumen.criticos || 0);
+            const personasAfectadas = Number(resumen.personasAfectadas || 0);
+            document.getElementById('report-total').textContent = total.toLocaleString('es-AR');
+            document.getElementById('report-critical').textContent = criticos.toLocaleString('es-AR');
+            document.getElementById('report-people').textContent = personasAfectadas.toLocaleString('es-AR');
+            document.getElementById('report-summary-text').textContent =
+                `En la selección se registraron ${total.toLocaleString('es-AR')} relevamientos; ` +
+                `${criticos.toLocaleString('es-AR')} superan el umbral automático y se reportaron ` +
+                `${personasAfectadas.toLocaleString('es-AR')} personas afectadas.`;
+
+            const form = document.getElementById('reports-filter-form');
+            const filtros = new FormData(form);
+            const criterios = [];
+            const barrio = String(filtros.get('barrio') || '').trim();
+            const desde = filtros.get('desde');
+            const hasta = filtros.get('hasta');
+            const riesgo = filtros.get('riesgo');
+
+            if (barrio) criterios.push(`Barrio: ${barrio}`);
+            if (desde) criterios.push(`Desde: ${new Date(`${desde}T00:00:00`).toLocaleDateString('es-AR')}`);
+            if (hasta) criterios.push(`Hasta: ${new Date(`${hasta}T00:00:00`).toLocaleDateString('es-AR')}`);
+            if (riesgo) {
+                const selectorRiesgo = form.elements.namedItem('riesgo');
+                criterios.push(`Clasificación: ${selectorRiesgo.selectedOptions[0].textContent}`);
+            }
+            document.getElementById('report-filters-summary').textContent =
+                criterios.length ? criterios.join(' · ') : 'Sin filtros adicionales.';
+
+            const filas = document.getElementById('report-rows');
+            filas.replaceChildren();
+            if (relevamientos.length === 0) {
+                const fila = document.createElement('tr');
+                const celda = document.createElement('td');
+                celda.colSpan = 8;
+                celda.textContent = 'No hay relevamientos para los filtros seleccionados.';
+                fila.appendChild(celda);
+                filas.appendChild(fila);
+            } else {
+                relevamientos.forEach((relevamiento) => {
+                    const fila = document.createElement('tr');
+                    [
+                        formatReportDate(relevamiento.fechaRegistro),
+                        relevamiento.barrio,
+                        `${relevamiento.nivelRioParana} m`,
+                        relevamiento.personasAfectadas || 0,
+                        relevamiento.estadoEvacuacion ? 'Sobre umbral (≥ 5,20 m)' : 'Sin alerta automática',
+                        relevamiento.necesidades || '—',
+                        relevamiento.observaciones || '—',
+                        relevamiento.registradoPor?.nombre || relevamiento.registradoPor?.email || '—'
+                    ].forEach((valor) => {
+                        const celda = document.createElement('td');
+                        celda.textContent = valor;
+                        fila.appendChild(celda);
+                    });
+                    filas.appendChild(fila);
+                });
+            }
+
+            document.getElementById('report-count-note').textContent = relevamientos.length === 500
+                ? 'El detalle incluye hasta 500 registros por consulta. Los indicadores del resumen corresponden a todos los resultados que cumplen los filtros.'
+                : `El detalle incluye los ${relevamientos.length} registro(s) que cumplen los filtros.`;
+        }
+
+        async function elaborarInforme() {
+            if (currentUser?.rol !== 'admin') return;
+
+            const boton = document.getElementById('generate-report-button');
+            boton.disabled = true;
+            try {
+                const query = reportsFiltersQuery();
+                const [relevamientos, resumen] = await Promise.all([
+                    reportsApi(query),
+                    reportsApi(`/resumen${query}`)
+                ]);
+                completarInformeRelevamientos(relevamientos, resumen);
+
+                const informe = document.getElementById('report-print-view');
+                const tituloAnterior = document.title;
+                informe.classList.remove('hidden');
+                informe.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('report-print-mode');
+                document.title = 'Informe de relevamientos - Goya';
+                try {
+                    window.print();
+                } finally {
+                    document.title = tituloAnterior;
+                    document.body.classList.remove('report-print-mode');
+                    informe.classList.add('hidden');
+                    informe.setAttribute('aria-hidden', 'true');
+                }
+            } catch (error) {
+                mostrarMensajeRelevamientos(error.message, true);
+            } finally {
+                boton.disabled = false;
             }
         }
 
@@ -676,8 +1028,9 @@
                     { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
                 );
                 if (response.status === 401) {
-                    cerrarSesion();
-                    throw new Error('La sesión expiró. Inicia sesión nuevamente.');
+                    const mensajeSesion = 'La sesión expiró. Inicia sesión nuevamente.';
+                    cerrarSesion(mensajeSesion);
+                    throw new Error(mensajeSesion);
                 }
                 if (!response.ok) {
                     const data = await response.json().catch(() => ({}));
@@ -738,6 +1091,8 @@
             document.getElementById('dashboard-container').classList.remove('hidden');
             document.getElementById('admin-panel-button').classList.toggle('hidden', currentUser?.rol !== 'admin');
             volverDashboardPrincipal();
+            actualizarEstadoRio();
+            if (!riverStatusTimer) riverStatusTimer = setInterval(actualizarEstadoRio, 60 * 1000);
             
             setTimeout(() => {
                 if (!mapInstance) {
@@ -755,9 +1110,24 @@
             }, 300);
         }
 
-        function cerrarSesion() {
+        function cerrarSesion(mensaje = '') {
             localStorage.removeItem('token');
             currentUser = null;
+            if (riverStatusTimer) {
+                clearInterval(riverStatusTimer);
+                riverStatusTimer = null;
+            }
+
+            if (mensaje) {
+                document.getElementById('dashboard-container').classList.add('hidden');
+                document.getElementById('auth-container').classList.remove('hidden');
+                document.getElementById('bg-hero').classList.remove('hidden');
+                const authMsg = document.getElementById('auth-msg');
+                authMsg.className = 'text-center text-sm mt-4 font-medium text-red-500';
+                authMsg.textContent = `${mensaje} Vuelve a iniciar sesión.`;
+                return;
+            }
+
             location.reload();
         }
     </script>
