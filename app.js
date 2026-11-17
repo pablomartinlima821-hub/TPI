@@ -13,6 +13,7 @@ app.use(express.json());
 app.use('/api/auth', require('./relevamiento_territorial/routes/authRoutes'));
 app.use('/api/relevamientos', require('./relevamiento_territorial/routes/surveyRoutes'));
 app.use('/api/rio', require('./routes/riverRoutes'));
+app.use('/api/barrios', require('./routes/barrioRoutes'));
 
 app.get('/web', async (req, res) => {
     const html = await fs.readFile(path.join(__dirname, 'index.html'), 'utf8');

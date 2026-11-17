@@ -1,0 +1,165 @@
+const crypto = require('crypto');
+const Barrio = require('../models/Barrio');
+const Relevamiento = require('../relevamiento_territorial/models/Relevamiento');
+
+const BARRIOS_INICIALES = [
+    {
+        clave: 'puerto-costanera',
+        nombre: 'Zona Puerto / Costanera',
+        ubicacion: 'Puerto y Costanera de Goya',
+        orden: 1
+    },
+    {
+        clave: 'matadero-riacho-goya',
+        nombre: 'B° Matadero / Riacho Goya',
+        ubicacion: 'Barrio Matadero, zona del Riacho Goya',
+        orden: 2
+    },
+    {
+        clave: 'paraje-el-bajo',
+        nombre: 'Zona Paraje El Bajo',
+        ubicacion: 'Paraje El Bajo',
+        orden: 3
+    }
+];
+
+const inicializarBarrios = async () => {
+    await Promise.all(BARRIOS_INICIALES.map(async (barrio) => {
+        try {
+            await Barrio.updateOne(
+                { clave: barrio.clave },
+                {
+                    $setOnInsert: {
+                        nombre: barrio.nombre,
+                        ubicacion: barrio.ubicacion,
+                        origenNombre: barrio.nombre,
+                        orden: barrio.orden
+                    }
+                },
+                { upsert: true }
+            );
+            await Barrio.updateOne(
+                { clave: barrio.clave, origenNombre: { $exists: false } },
+                { $set: { origenNombre: barrio.nombre } }
+            );
+        } catch (error) {
+            if (error.code !== 11000) throw error;
+        }
+    }));
+};
+
+const importarBarriosRelevados = async () => {
+    const relevamientos = await Relevamiento.aggregate([
+        { $match: { barrio: { $type: 'string', $ne: '' } } },
+        { $sort: { fechaRegistro: -1 } },
+        {
+            $group: {
+                _id: { $trim: { input: '$barrio' } },
+                coordenadas: { $first: '$coordenadas' }
+            }
+        },
+        { $match: { _id: { $ne: '' } } }
+    ]);
+    const nombres = relevamientos.map(({ _id }) => _id);
+    if (!nombres.length) return;
+
+    const existentes = await Barrio.find({
+        $or: [
+            { origenNombre: { $in: nombres } },
+            { nombre: { $in: nombres } }
+        ]
+    }).select('nombre origenNombre coordenadas').lean();
+    const nombresExistentes = new Set();
+    const barrioPorNombreOrigen = new Map();
+    existentes.forEach((barrio) => {
+        if (barrio.origenNombre) nombresExistentes.add(barrio.origenNombre);
+        nombresExistentes.add(barrio.nombre);
+        barrioPorNombreOrigen.set(barrio.origenNombre || barrio.nombre, barrio);
+    });
+
+    const ultimoBarrio = await Barrio.findOne().sort({ orden: -1 }).select('orden').lean();
+    let orden = Number(ultimoBarrio?.orden || 0) + 1;
+    for (const relevamiento of relevamientos) {
+        const nombre = relevamiento._id;
+        if (nombresExistentes.has(nombre)) {
+            const existente = barrioPorNombreOrigen.get(nombre);
+            if (existente && (!existente.origenNombre || !existente.coordenadas) && relevamiento.coordenadas) {
+                const cambios = {};
+                if (!existente.origenNombre) cambios.origenNombre = nombre;
+                if (!existente.coordenadas) cambios.coordenadas = relevamiento.coordenadas;
+                await Barrio.updateOne({ _id: existente._id }, { $set: cambios });
+            }
+            continue;
+        }
+
+        const clave = `relevamiento-${crypto.createHash('sha256').update(nombre).digest('hex').slice(0, 24)}`;
+        try {
+            await Barrio.updateOne(
+                { clave },
+                {
+                    $setOnInsert: {
+                        clave,
+                        nombre,
+                        ubicacion: 'Ubicación registrada en relevamientos',
+                        origenNombre: nombre,
+                        coordenadas: relevamiento.coordenadas || null,
+                        orden
+                    }
+                },
+                { upsert: true }
+            );
+            nombresExistentes.add(nombre);
+            orden += 1;
+        } catch (error) {
+            if (error.code !== 11000) throw error;
+        }
+    }
+};
+
+const obtenerBarrios = async (req, res) => {
+    try {
+        await inicializarBarrios();
+        await importarBarriosRelevados();
+        const barrios = await Barrio.find().sort({ orden: 1 }).lean();
+        return res.status(200).json(barrios);
+    } catch (error) {
+        console.error(`No se pudieron consultar los barrios: ${error.message}`);
+        return res.status(500).json({ mensaje: 'No se pudieron consultar los barrios.' });
+    }
+};
+
+const actualizarBarrio = async (req, res) => {
+    const nombre = typeof req.body?.nombre === 'string' ? req.body.nombre.trim() : '';
+    const ubicacion = typeof req.body?.ubicacion === 'string' ? req.body.ubicacion.trim() : '';
+    const latTexto = req.body?.coordenadas?.lat;
+    const lngTexto = req.body?.coordenadas?.lng;
+    const lat = typeof latTexto === 'number' || typeof latTexto === 'string' ? Number(latTexto) : NaN;
+    const lng = typeof lngTexto === 'number' || typeof lngTexto === 'string' ? Number(lngTexto) : NaN;
+
+    if (!nombre || nombre.length > 120 || !ubicacion || ubicacion.length > 300 ||
+        !Number.isFinite(lat) || lat < -29.5 || lat > -29 ||
+        !Number.isFinite(lng) || lng < -59.5 || lng > -59) {
+        return res.status(400).json({
+            mensaje: 'Ingresa un nombre, una ubicación y coordenadas válidas dentro del área de Goya.'
+        });
+    }
+
+    try {
+        const barrio = await Barrio.findOneAndUpdate(
+            { clave: req.params.clave },
+            { $set: { nombre, ubicacion, coordenadas: { lat, lng } } },
+            { new: true, runValidators: true }
+        ).lean();
+
+        if (!barrio) {
+            return res.status(404).json({ mensaje: 'No se encontró el barrio que quieres editar.' });
+        }
+
+        return res.status(200).json({ mensaje: 'Barrio actualizado.', data: barrio });
+    } catch (error) {
+        console.error(`No se pudo actualizar el barrio: ${error.message}`);
+        return res.status(500).json({ mensaje: 'No se pudo actualizar el barrio.' });
+    }
+};
+
+module.exports = { obtenerBarrios, actualizarBarrio };

@@ -249,31 +249,35 @@
                 <!-- Panel de Datos y Zonas Vulnerables -->
                 <div class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border dark:border-slate-600 flex flex-col justify-between h-[500px]">
                     <div>
-                        <h3 class="font-bold text-slate-700 dark:text-slate-200 mb-3 text-lg border-b dark:border-slate-600 pb-2">Zonas de Riesgo Monitoreadas</h3>
-                        <div class="space-y-3 overflow-y-auto max-h-[380px] pr-1">
-                            <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-600 shadow-sm">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-semibold text-slate-800 dark:text-white text-sm">Zona Puerto / Costanera</span>
-                                    <span class="bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 text-xs px-2 py-0.5 rounded-full font-medium">Alerta Media</span>
-                                </div>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Nivel del río en constante observación por crecida.</p>
-                            </div>
-                            <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-600 shadow-sm">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-semibold text-slate-800 dark:text-white text-sm">B° Matadero / Riacho Goya</span>
-                                    <span class="bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 text-xs px-2 py-0.5 rounded-full font-medium">Crítico</span>
-                                </div>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Monitoreo de familias afectadas por desborde.</p>
-                            </div>
-                            <div class="bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-600 shadow-sm">
-                                <div class="flex justify-between items-center">
-                                    <span class="font-semibold text-slate-800 dark:text-white text-sm">Zona Paraje El Bajo</span>
-                                    <span class="bg-emerald-100 text-emerald-800 dark:text-emerald-900/50 dark:text-emerald-300 text-xs px-2 py-0.5 rounded-full font-medium">Estable</span>
-                                </div>
-                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Caminos transitables, sin reporte de ingresos de agua.</p>
-                            </div>
+                        <div class="flex flex-wrap justify-between items-center gap-2 mb-3 border-b dark:border-slate-600 pb-2">
+                            <h3 class="font-bold text-slate-700 dark:text-slate-200 text-lg">Zonas de Riesgo Monitoreadas</h3>
+                            <button id="edit-neighborhoods-button" onclick="toggleEdicionBarrios()" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs">Editar barrios</button>
                         </div>
+                        <div id="neighborhood-list" class="space-y-3 overflow-y-auto max-h-[340px] pr-1" aria-live="polite"></div>
+                        <p id="neighborhood-message" role="status" class="text-xs mt-2"></p>
                     </div>
+                    <form id="neighborhood-edit-form" class="hidden mt-3 pt-3 border-t dark:border-slate-600 space-y-2">
+                        <p class="text-sm font-semibold text-slate-800 dark:text-white">Editar barrio</p>
+                        <label class="block text-xs text-slate-600 dark:text-slate-300">Nombre
+                            <input name="nombre" required maxlength="120" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
+                        </label>
+                        <label class="block text-xs text-slate-600 dark:text-slate-300">Ubicación
+                            <textarea name="ubicacion" required maxlength="300" rows="2" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm"></textarea>
+                        </label>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Ingresa las coordenadas o haz clic en el mapa para seleccionarlas.</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="text-xs text-slate-600 dark:text-slate-300">Latitud
+                                <input name="lat" type="number" step="any" min="-29.5" max="-29" required class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
+                            </label>
+                            <label class="text-xs text-slate-600 dark:text-slate-300">Longitud
+                                <input name="lng" type="number" step="any" min="-59.5" max="-59" required class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
+                            </label>
+                        </div>
+                        <div class="flex gap-2">
+                            <button type="submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm">Guardar</button>
+                            <button type="button" onclick="cancelarEdicionBarrio()" class="bg-slate-500 hover:bg-slate-600 text-white px-3 py-2 rounded-lg text-sm">Cancelar</button>
+                        </div>
+                    </form>
                     <div class="text-center pt-2 border-t dark:border-slate-600">
                         <span class="text-xs text-slate-400">Sistema Activo - Goya, Corrientes</span>
                     </div>
@@ -459,6 +463,10 @@
         let selectedReportMarker = null;
         let riverStatusTimer = null;
         let riverStatusRequest = null;
+        let barrios = [];
+        let barriosMarkerLayer = null;
+        let editingBarrioClave = null;
+        let editingBarrioMarker = null;
 
         const reportsApi = async (path, options = {}) => {
             const response = await fetch(`${API_URL}/api/relevamientos${path}`, {
@@ -484,6 +492,213 @@
             }
             return data;
         };
+
+        const barriosApi = async (path, options = {}) => {
+            const response = await fetch(`${API_URL}/api/barrios${path}`, {
+                ...options,
+                headers: {
+                    ...(options.headers || {}),
+                    Authorization: 'Bearer ' + localStorage.getItem('token'),
+                    ...(options.body ? { 'Content-Type': 'application/json' } : {})
+                }
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.status === 401) {
+                const mensajeSesion = data.mensaje || 'La sesión expiró. Inicia sesión nuevamente.';
+                cerrarSesion(mensajeSesion);
+                throw new Error(mensajeSesion);
+            }
+            if (!response.ok) {
+                throw new Error(data.mensaje || 'No se pudieron actualizar los barrios.');
+            }
+            return data;
+        };
+
+        const presentacionBarrios = {
+            'puerto-costanera': {
+                estado: 'Alerta Media',
+                descripcion: 'Nivel del río en constante observación por crecida.',
+                clases: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
+            },
+            'matadero-riacho-goya': {
+                estado: 'Crítico',
+                descripcion: 'Monitoreo de familias afectadas por desborde.',
+                clases: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+            },
+            'paraje-el-bajo': {
+                estado: 'Estable',
+                descripcion: 'Caminos transitables, sin reporte de ingresos de agua.',
+                clases: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
+            }
+        };
+
+        function mostrarBarrios() {
+            const lista = document.getElementById('neighborhood-list');
+            const formularioVisible = !document.getElementById('neighborhood-edit-form').classList.contains('hidden');
+            lista.classList.toggle('max-h-[160px]', formularioVisible);
+            lista.classList.toggle('max-h-[340px]', !formularioVisible);
+            lista.replaceChildren();
+            if (barriosMarkerLayer) barriosMarkerLayer.clearLayers();
+
+            barrios.forEach((barrio) => {
+                const tarjeta = document.createElement('article');
+                tarjeta.className = 'bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-600 shadow-sm';
+                const encabezado = document.createElement('div');
+                encabezado.className = 'flex justify-between items-center gap-2';
+                const nombre = document.createElement('span');
+                nombre.className = 'font-semibold text-slate-800 dark:text-white text-sm';
+                nombre.textContent = barrio.nombre;
+                encabezado.appendChild(nombre);
+
+                const estado = presentacionBarrios[barrio.clave];
+                if (estado) {
+                    const etiqueta = document.createElement('span');
+                    etiqueta.className = `${estado.clases} text-xs px-2 py-0.5 rounded-full font-medium shrink-0`;
+                    etiqueta.textContent = estado.estado;
+                    encabezado.appendChild(etiqueta);
+                }
+
+                const ubicacion = document.createElement('p');
+                ubicacion.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
+                ubicacion.textContent = `Ubicación: ${barrio.ubicacion}`;
+                tarjeta.append(encabezado, ubicacion);
+
+                if (estado?.descripcion) {
+                    const descripcion = document.createElement('p');
+                    descripcion.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
+                    descripcion.textContent = estado.descripcion;
+                    tarjeta.appendChild(descripcion);
+                }
+
+                const lat = Number(barrio.coordenadas?.lat);
+                const lng = Number(barrio.coordenadas?.lng);
+                if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                    const coordenadas = document.createElement('p');
+                    coordenadas.className = 'text-xs text-slate-400 mt-1';
+                    coordenadas.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                    tarjeta.appendChild(coordenadas);
+
+                    if (barriosMarkerLayer) {
+                        const popup = document.createElement('strong');
+                        popup.textContent = barrio.nombre;
+                        L.marker([lat, lng]).bindPopup(popup).addTo(barriosMarkerLayer);
+                    }
+                } else {
+                    const sinCoordenadas = document.createElement('p');
+                    sinCoordenadas.className = 'text-xs text-amber-600 dark:text-amber-300 mt-1';
+                    sinCoordenadas.textContent = 'Coordenadas pendientes de configurar';
+                    tarjeta.appendChild(sinCoordenadas);
+                }
+
+                if (currentUser?.rol === 'admin' &&
+                    !document.getElementById('neighborhood-edit-form').classList.contains('hidden')) {
+                    const editar = document.createElement('button');
+                    editar.type = 'button';
+                    editar.className = 'mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline';
+                    editar.textContent = 'Editar';
+                    editar.addEventListener('click', () => editarBarrio(barrio));
+                    tarjeta.appendChild(editar);
+                }
+                lista.appendChild(tarjeta);
+            });
+        }
+
+        async function actualizarBarrios() {
+            const mensaje = document.getElementById('neighborhood-message');
+            try {
+                barrios = await barriosApi('/');
+                mostrarBarrios();
+                mensaje.textContent = '';
+            } catch (error) {
+                mensaje.className = 'text-xs mt-2 text-red-500';
+                mensaje.textContent = error.message;
+            }
+        }
+
+        function toggleEdicionBarrios() {
+            const formulario = document.getElementById('neighborhood-edit-form');
+            const mostrar = formulario.classList.contains('hidden');
+            formulario.classList.toggle('hidden', !mostrar);
+            if (!mostrar) cancelarEdicionBarrio();
+            mostrarBarrios();
+            if (mostrar) actualizarBarrios();
+        }
+
+        function editarBarrio(barrio) {
+            if (editingBarrioMarker && mapInstance) mapInstance.removeLayer(editingBarrioMarker);
+            editingBarrioMarker = null;
+            editingBarrioClave = barrio.clave;
+            const formulario = document.getElementById('neighborhood-edit-form');
+            formulario.querySelector('[name="nombre"]').value = barrio.nombre;
+            formulario.querySelector('[name="ubicacion"]').value = barrio.ubicacion;
+            formulario.querySelector('[name="lat"]').value = barrio.coordenadas?.lat ?? '';
+            formulario.querySelector('[name="lng"]').value = barrio.coordenadas?.lng ?? '';
+            formulario.classList.remove('hidden');
+            mostrarBarrios();
+        }
+
+        function cancelarEdicionBarrio() {
+            editingBarrioClave = null;
+            const formulario = document.getElementById('neighborhood-edit-form');
+            formulario.reset();
+            formulario.classList.add('hidden');
+            if (editingBarrioMarker && mapInstance) mapInstance.removeLayer(editingBarrioMarker);
+            editingBarrioMarker = null;
+            mostrarBarrios();
+        }
+
+        function seleccionarCoordenadasBarrio(event) {
+            if (!editingBarrioClave || currentUser?.rol !== 'admin') return;
+            const { lat, lng } = event.latlng;
+            if (lat < -29.5 || lat > -29 || lng < -59.5 || lng > -59) {
+                const mensaje = document.getElementById('neighborhood-message');
+                mensaje.className = 'text-xs mt-2 text-red-500';
+                mensaje.textContent = 'Selecciona una ubicación dentro del área de Goya.';
+                return;
+            }
+
+            document.querySelector('#neighborhood-edit-form [name="lat"]').value = lat.toFixed(6);
+            document.querySelector('#neighborhood-edit-form [name="lng"]').value = lng.toFixed(6);
+            if (editingBarrioMarker) editingBarrioMarker.setLatLng([lat, lng]);
+            else editingBarrioMarker = L.marker([lat, lng]).addTo(mapInstance);
+            const mensaje = document.getElementById('neighborhood-message');
+            mensaje.className = 'text-xs mt-2 text-emerald-600';
+            mensaje.textContent = 'Coordenadas seleccionadas. Guarda los cambios para aplicarlas.';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('neighborhood-edit-form').addEventListener('submit', async (event) => {
+                event.preventDefault();
+                if (!editingBarrioClave) return;
+
+                const formulario = event.currentTarget;
+                const campos = new FormData(formulario);
+                const mensaje = document.getElementById('neighborhood-message');
+                try {
+                    const resultado = await barriosApi(`/${encodeURIComponent(editingBarrioClave)}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            nombre: campos.get('nombre'),
+                            ubicacion: campos.get('ubicacion'),
+                            coordenadas: {
+                                lat: Number(campos.get('lat')),
+                                lng: Number(campos.get('lng'))
+                            }
+                        })
+                    });
+                    barrios = barrios.map((barrio) =>
+                        barrio.clave === editingBarrioClave ? resultado.data : barrio
+                    );
+                    cancelarEdicionBarrio();
+                    mostrarBarrios();
+                    mensaje.className = 'text-xs mt-2 text-emerald-600';
+                    mensaje.textContent = resultado.mensaje;
+                } catch (error) {
+                    mensaje.className = 'text-xs mt-2 text-red-500';
+                    mensaje.textContent = error.message;
+                }
+            });
+        });
 
         async function actualizarEstadoRio() {
             if (riverStatusRequest) return riverStatusRequest;
@@ -1090,6 +1305,7 @@
             document.getElementById('bg-hero').classList.add('hidden');
             document.getElementById('dashboard-container').classList.remove('hidden');
             document.getElementById('admin-panel-button').classList.toggle('hidden', currentUser?.rol !== 'admin');
+            document.getElementById('edit-neighborhoods-button').classList.toggle('hidden', currentUser?.rol !== 'admin');
             volverDashboardPrincipal();
             actualizarEstadoRio();
             if (!riverStatusTimer) riverStatusTimer = setInterval(actualizarEstadoRio, 60 * 1000);
@@ -1104,6 +1320,9 @@
                     L.marker([-29.1425077, -59.2719217]).addTo(mapInstance)
                         .bindPopup('<b>Monitoreo Goya</b><br/>Zona Costera / Puerto.')
                         .openPopup();
+                    barriosMarkerLayer = L.layerGroup().addTo(mapInstance);
+                    mapInstance.on('click', seleccionarCoordenadasBarrio);
+                    actualizarBarrios();
                 } else {
                     mapInstance.invalidateSize();
                 }
