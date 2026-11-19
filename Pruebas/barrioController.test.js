@@ -1,7 +1,8 @@
 jest.mock('../models/Barrio', () => ({
     updateOne: jest.fn(),
     find: jest.fn(),
-    findOne: jest.fn()
+    findOne: jest.fn(),
+    findOneAndUpdate: jest.fn()
 }));
 
 jest.mock('../relevamiento_territorial/models/Relevamiento', () => ({
@@ -10,7 +11,7 @@ jest.mock('../relevamiento_territorial/models/Relevamiento', () => ({
 
 const Barrio = require('../models/Barrio');
 const Relevamiento = require('../relevamiento_territorial/models/Relevamiento');
-const { obtenerBarrios } = require('../controllers/barrioController');
+const { obtenerBarrios, eliminarBarrio } = require('../controllers/barrioController');
 
 const consulta = (resultado) => ({
     sort: jest.fn().mockReturnThis(),
@@ -61,5 +62,40 @@ describe('Gestión de barrios', () => {
             }),
             { upsert: true }
         );
+        expect(Barrio.find).toHaveBeenLastCalledWith({ eliminado: { $ne: true } });
+    });
+
+    it('oculta un barrio eliminado sin borrar los relevamientos históricos', async () => {
+        Barrio.findOneAndUpdate.mockReturnValue({
+            lean: () => Promise.resolve({ clave: 'relevamiento-mal-cargado', eliminado: true })
+        });
+        const respuesta = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        await eliminarBarrio({ params: { clave: 'relevamiento-mal-cargado' } }, respuesta);
+
+        expect(Barrio.findOneAndUpdate).toHaveBeenCalledWith(
+            { clave: 'relevamiento-mal-cargado', eliminado: { $ne: true } },
+            { $set: { eliminado: true } },
+            { new: true }
+        );
+        expect(respuesta.status).toHaveBeenCalledWith(200);
+        expect(respuesta.json).toHaveBeenCalledWith({ mensaje: 'Barrio eliminado de la lista.' });
+    });
+
+    it('devuelve 404 si el barrio ya no está disponible para eliminar', async () => {
+        Barrio.findOneAndUpdate.mockReturnValue({
+            lean: () => Promise.resolve(null)
+        });
+        const respuesta = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        await eliminarBarrio({ params: { clave: 'no-existe' } }, respuesta);
+
+        expect(respuesta.status).toHaveBeenCalledWith(404);
     });
 });

@@ -592,12 +592,23 @@
 
                 if (currentUser?.rol === 'admin' &&
                     !document.getElementById('neighborhood-edit-form').classList.contains('hidden')) {
+                    const acciones = document.createElement('div');
+                    acciones.className = 'mt-2 flex gap-3';
+
                     const editar = document.createElement('button');
                     editar.type = 'button';
-                    editar.className = 'mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline';
+                    editar.className = 'text-xs text-blue-600 dark:text-blue-400 hover:underline';
                     editar.textContent = 'Editar';
                     editar.addEventListener('click', () => editarBarrio(barrio));
-                    tarjeta.appendChild(editar);
+
+                    const eliminar = document.createElement('button');
+                    eliminar.type = 'button';
+                    eliminar.className = 'text-xs text-red-600 dark:text-red-400 hover:underline';
+                    eliminar.textContent = 'Eliminar';
+                    eliminar.addEventListener('click', () => eliminarBarrio(barrio));
+
+                    acciones.append(editar, eliminar);
+                    tarjeta.appendChild(acciones);
                 }
                 lista.appendChild(tarjeta);
             });
@@ -635,6 +646,27 @@
             formulario.querySelector('[name="lng"]').value = barrio.coordenadas?.lng ?? '';
             formulario.classList.remove('hidden');
             mostrarBarrios();
+        }
+
+        async function eliminarBarrio(barrio) {
+            if (!window.confirm(
+                `¿Quitar "${barrio.nombre}" de la lista? Los relevamientos históricos se conservarán.`
+            )) return;
+
+            const mensaje = document.getElementById('neighborhood-message');
+            try {
+                const resultado = await barriosApi(`/${encodeURIComponent(barrio.clave)}`, {
+                    method: 'DELETE'
+                });
+                if (editingBarrioClave === barrio.clave) cancelarEdicionBarrio();
+                barrios = barrios.filter((item) => item.clave !== barrio.clave);
+                mostrarBarrios();
+                mensaje.className = 'text-xs mt-2 text-emerald-600';
+                mensaje.textContent = resultado.mensaje;
+            } catch (error) {
+                mensaje.className = 'text-xs mt-2 text-red-500';
+                mensaje.textContent = error.message;
+            }
         }
 
         function cancelarEdicionBarrio() {

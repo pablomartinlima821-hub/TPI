@@ -120,7 +120,7 @@ const obtenerBarrios = async (req, res) => {
     try {
         await inicializarBarrios();
         await importarBarriosRelevados();
-        const barrios = await Barrio.find().sort({ orden: 1 }).lean();
+        const barrios = await Barrio.find({ eliminado: { $ne: true } }).sort({ orden: 1 }).lean();
         return res.status(200).json(barrios);
     } catch (error) {
         console.error(`No se pudieron consultar los barrios: ${error.message}`);
@@ -146,7 +146,7 @@ const actualizarBarrio = async (req, res) => {
 
     try {
         const barrio = await Barrio.findOneAndUpdate(
-            { clave: req.params.clave },
+            { clave: req.params.clave, eliminado: { $ne: true } },
             { $set: { nombre, ubicacion, coordenadas: { lat, lng } } },
             { new: true, runValidators: true }
         ).lean();
@@ -162,4 +162,23 @@ const actualizarBarrio = async (req, res) => {
     }
 };
 
-module.exports = { obtenerBarrios, actualizarBarrio };
+const eliminarBarrio = async (req, res) => {
+    try {
+        const barrio = await Barrio.findOneAndUpdate(
+            { clave: req.params.clave, eliminado: { $ne: true } },
+            { $set: { eliminado: true } },
+            { new: true }
+        ).lean();
+
+        if (!barrio) {
+            return res.status(404).json({ mensaje: 'No se encontró el barrio que quieres eliminar.' });
+        }
+
+        return res.status(200).json({ mensaje: 'Barrio eliminado de la lista.' });
+    } catch (error) {
+        console.error(`No se pudo eliminar el barrio: ${error.message}`);
+        return res.status(500).json({ mensaje: 'No se pudo eliminar el barrio.' });
+    }
+};
+
+module.exports = { obtenerBarrios, actualizarBarrio, eliminarBarrio };

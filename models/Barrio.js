@@ -11,7 +11,8 @@ const barrioSchema = new mongoose.Schema({
     ubicacion: { type: String, required: true, trim: true, maxlength: 300 },
     origenNombre: { type: String, trim: true, maxlength: 120 },
     coordenadas: { type: coordenadasSchema, default: null },
-    orden: { type: Number, required: true }
+    orden: { type: Number, required: true },
+    eliminado: { type: Boolean, default: false }
 }, { timestamps: true });
 
 module.exports = mongoose.model('Barrio', barrioSchema);

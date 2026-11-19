@@ -48,6 +48,10 @@ El directorio `relevamiento_territorial/` agrupa el flujo de usuarios y
 relevamientos; el resto de los directorios principales reúne las funciones de
 monitoreo del río y administración de barrios.
 
+Los administradores pueden quitar barrios mal cargados de la lista. La baja es
+lógica para evitar que un barrio vuelva a aparecer por la importación automática
+de relevamientos; los relevamientos históricos asociados no se eliminan.
+
 ## Desarrollo local
 
 Requiere Node.js y una instancia de MongoDB accesible. Las variables de entorno
