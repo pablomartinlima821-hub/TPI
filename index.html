@@ -264,13 +264,19 @@
                         <label class="block text-xs text-slate-600 dark:text-slate-300">Ubicación
                             <textarea name="ubicacion" required maxlength="300" rows="2" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm"></textarea>
                         </label>
-                        <p class="text-xs text-slate-500 dark:text-slate-400">Ingresa las coordenadas o haz clic en el mapa para seleccionarlas.</p>
+                        <label class="block text-xs text-slate-600 dark:text-slate-300">Situación
+                            <select name="situacion" required class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
+                                <option value="estable">Estable</option>
+                                <option value="critico">Crítico</option>
+                            </select>
+                        </label>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">Las coordenadas son opcionales; también puedes hacer clic en el mapa para seleccionarlas.</p>
                         <div class="grid grid-cols-2 gap-2">
                             <label class="text-xs text-slate-600 dark:text-slate-300">Latitud
-                                <input name="lat" type="number" step="any" min="-29.5" max="-29" required class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
+                                <input name="lat" type="number" step="any" min="-29.5" max="-29" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
                             </label>
                             <label class="text-xs text-slate-600 dark:text-slate-300">Longitud
-                                <input name="lng" type="number" step="any" min="-59.5" max="-59" required class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
+                                <input name="lng" type="number" step="any" min="-59.5" max="-59" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
                             </label>
                         </div>
                         <div class="flex gap-2">
@@ -341,7 +347,7 @@
                                 <section class="xl:col-span-2 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border dark:border-slate-600">
                                     <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
                                         <h4 class="font-bold text-slate-800 dark:text-white">Mapa de reportes</h4>
-                                        <span class="text-xs text-slate-500 dark:text-slate-300">Rojo: sobre umbral · Verde: sin alerta automática</span>
+                                        <span class="text-xs text-slate-500 dark:text-slate-300">Rojo: barrio crítico · Verde: barrio estable · Gris: sin situación</span>
                                     </div>
                                     <div id="reports-map" class="h-[480px] rounded-lg overflow-hidden bg-slate-200"></div>
                                     <p class="text-xs text-slate-500 dark:text-slate-300 mt-2">Haz clic en el mapa para seleccionar la ubicación del reporte.</p>
@@ -389,7 +395,8 @@
                                     <table class="w-full text-sm text-left text-slate-700 dark:text-slate-200">
                                         <thead><tr class="border-b dark:border-slate-600">
                                             <th class="p-2">Fecha</th><th class="p-2">Zona</th><th class="p-2">Río</th>
-                                            <th class="p-2">Personas</th><th class="p-2">Estado</th><th class="p-2">Responsable</th>
+                                            <th class="p-2">Personas</th><th class="p-2">Clasificación del reporte</th>
+                                            <th class="p-2">Situación actual del barrio</th><th class="p-2">Responsable</th>
                                         </tr></thead>
                                         <tbody id="reports-rows"></tbody>
                                     </table>
@@ -514,24 +521,6 @@
             return data;
         };
 
-        const presentacionBarrios = {
-            'puerto-costanera': {
-                estado: 'Alerta Media',
-                descripcion: 'Nivel del río en constante observación por crecida.',
-                clases: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300'
-            },
-            'matadero-riacho-goya': {
-                estado: 'Crítico',
-                descripcion: 'Monitoreo de familias afectadas por desborde.',
-                clases: 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-            },
-            'paraje-el-bajo': {
-                estado: 'Estable',
-                descripcion: 'Caminos transitables, sin reporte de ingresos de agua.',
-                clases: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300'
-            }
-        };
-
         function mostrarBarrios() {
             const lista = document.getElementById('neighborhood-list');
             const formularioVisible = !document.getElementById('neighborhood-edit-form').classList.contains('hidden');
@@ -550,25 +539,18 @@
                 nombre.textContent = barrio.nombre;
                 encabezado.appendChild(nombre);
 
-                const estado = presentacionBarrios[barrio.clave];
-                if (estado) {
-                    const etiqueta = document.createElement('span');
-                    etiqueta.className = `${estado.clases} text-xs px-2 py-0.5 rounded-full font-medium shrink-0`;
-                    etiqueta.textContent = estado.estado;
-                    encabezado.appendChild(etiqueta);
-                }
+                const critico = barrio.situacion === 'critico';
+                const etiqueta = document.createElement('span');
+                etiqueta.className = critico
+                    ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 text-xs px-2 py-0.5 rounded-full font-medium shrink-0'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 text-xs px-2 py-0.5 rounded-full font-medium shrink-0';
+                etiqueta.textContent = critico ? 'Crítico' : 'Estable';
+                encabezado.appendChild(etiqueta);
 
                 const ubicacion = document.createElement('p');
                 ubicacion.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
                 ubicacion.textContent = `Ubicación: ${barrio.ubicacion}`;
                 tarjeta.append(encabezado, ubicacion);
-
-                if (estado?.descripcion) {
-                    const descripcion = document.createElement('p');
-                    descripcion.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
-                    descripcion.textContent = estado.descripcion;
-                    tarjeta.appendChild(descripcion);
-                }
 
                 const lat = Number(barrio.coordenadas?.lat);
                 const lng = Number(barrio.coordenadas?.lng);
@@ -580,8 +562,13 @@
 
                     if (barriosMarkerLayer) {
                         const popup = document.createElement('strong');
-                        popup.textContent = barrio.nombre;
-                        L.marker([lat, lng]).bindPopup(popup).addTo(barriosMarkerLayer);
+                        popup.textContent = `${barrio.nombre} · ${critico ? 'Crítico' : 'Estable'}`;
+                        L.circleMarker([lat, lng], {
+                            radius: 9,
+                            color: critico ? '#991b1b' : '#166534',
+                            fillColor: critico ? '#ef4444' : '#22c55e',
+                            fillOpacity: 0.85
+                        }).bindPopup(popup).addTo(barriosMarkerLayer);
                     }
                 } else {
                     const sinCoordenadas = document.createElement('p');
@@ -642,6 +629,7 @@
             const formulario = document.getElementById('neighborhood-edit-form');
             formulario.querySelector('[name="nombre"]').value = barrio.nombre;
             formulario.querySelector('[name="ubicacion"]').value = barrio.ubicacion;
+            formulario.querySelector('[name="situacion"]').value = barrio.situacion || 'estable';
             formulario.querySelector('[name="lat"]').value = barrio.coordenadas?.lat ?? '';
             formulario.querySelector('[name="lng"]').value = barrio.coordenadas?.lng ?? '';
             formulario.classList.remove('hidden');
@@ -705,6 +693,8 @@
 
                 const formulario = event.currentTarget;
                 const campos = new FormData(formulario);
+                const lat = String(campos.get('lat') || '').trim();
+                const lng = String(campos.get('lng') || '').trim();
                 const mensaje = document.getElementById('neighborhood-message');
                 try {
                     const resultado = await barriosApi(`/${encodeURIComponent(editingBarrioClave)}`, {
@@ -712,10 +702,13 @@
                         body: JSON.stringify({
                             nombre: campos.get('nombre'),
                             ubicacion: campos.get('ubicacion'),
-                            coordenadas: {
-                                lat: Number(campos.get('lat')),
-                                lng: Number(campos.get('lng'))
-                            }
+                            situacion: campos.get('situacion'),
+                            ...(lat || lng ? {
+                                coordenadas: {
+                                    lat: lat ? Number(lat) : null,
+                                    lng: lng ? Number(lng) : null
+                                }
+                            } : {})
                         })
                     });
                     barrios = barrios.map((barrio) =>
@@ -1061,7 +1054,26 @@
             if (marcador) marcador.openPopup();
         }
 
-        function mostrarRelevamientos(relevamientos) {
+        function normalizarNombreBarrio(nombre) {
+            return String(nombre || '')
+                .trim()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLocaleLowerCase('es-AR');
+        }
+
+        function indexarSituacionesBarrios(barrios) {
+            const situaciones = new Map();
+            barrios.forEach((barrio) => {
+                [barrio.nombre, barrio.origenNombre].forEach((nombre) => {
+                    const clave = normalizarNombreBarrio(nombre);
+                    if (clave) situaciones.set(clave, barrio.situacion);
+                });
+            });
+            return situaciones;
+        }
+
+        function mostrarRelevamientos(relevamientos, situacionesPorBarrio) {
             reportsMarkerLayer.clearLayers();
             const filas = document.getElementById('reports-rows');
             filas.replaceChildren();
@@ -1069,27 +1081,39 @@
 
             relevamientos.forEach((relevamiento) => {
                 const critico = relevamiento.estadoEvacuacion;
+                const situacionBarrio = situacionesPorBarrio.get(
+                    normalizarNombreBarrio(relevamiento.barrio)
+                );
+                const estadoBarrio = situacionBarrio === 'critico'
+                    ? 'Crítico'
+                    : situacionBarrio === 'estable' ? 'Estable' : 'Sin situación';
                 const lat = Number(relevamiento.coordenadas?.lat);
                 const lng = Number(relevamiento.coordenadas?.lng);
                 const coordenadasValidas = Number.isFinite(lat) && Number.isFinite(lng) &&
                     lat >= -29.5 && lat <= -29 && lng >= -59.5 && lng <= -59;
 
                 if (coordenadasValidas) {
+                    const color = situacionBarrio === 'critico'
+                        ? { borde: '#991b1b', relleno: '#ef4444' }
+                        : situacionBarrio === 'estable'
+                            ? { borde: '#166534', relleno: '#22c55e' }
+                            : { borde: '#475569', relleno: '#94a3b8' };
                     const marcador = L.circleMarker(
                         [lat, lng],
                         {
                             radius: 9,
-                            color: critico ? '#991b1b' : '#166534',
-                            fillColor: critico ? '#ef4444' : '#22c55e',
+                            color: color.borde,
+                            fillColor: color.relleno,
                             fillOpacity: 0.85
                         }
                     ).addTo(reportsMarkerLayer);
                     marcador.relevamientoId = relevamiento._id;
                     marcador.bindPopup(
                         `<strong>${escapeReportHtml(relevamiento.barrio)}</strong><br>` +
+                        `Situación actual del barrio: ${escapeReportHtml(estadoBarrio)}<br>` +
                         `Nivel: ${escapeReportHtml(relevamiento.nivelRioParana)} m<br>` +
                         `Personas reportadas: ${escapeReportHtml(relevamiento.personasAfectadas || 0)}<br>` +
-                        `${critico ? 'Sobre el umbral automático (5,20 m)' : 'Sin alerta automática'}<br>` +
+                        `Clasificación del reporte: ${critico ? 'Sobre el umbral automático (5,20 m)' : 'Sin alerta automática'}<br>` +
                         `Fecha: ${escapeReportHtml(formatReportDate(relevamiento.fechaRegistro))}`
                     );
                 } else {
@@ -1109,6 +1133,7 @@
                     `${relevamiento.nivelRioParana} m`,
                     relevamiento.personasAfectadas || 0,
                     critico ? 'Sobre el umbral' : 'Sin alerta automática',
+                    estadoBarrio,
                     relevamiento.registradoPor?.nombre || relevamiento.registradoPor?.email || '—'
                 ].forEach((valor) => {
                     const celda = document.createElement('td');
@@ -1131,11 +1156,12 @@
         async function actualizarPanelRelevamientos() {
             try {
                 const query = reportsFiltersQuery();
-                const [relevamientos, resumen] = await Promise.all([
+                const [relevamientos, resumen, barriosActuales] = await Promise.all([
                     reportsApi(query),
-                    reportsApi(`/resumen${query}`)
+                    reportsApi(`/resumen${query}`),
+                    barriosApi('/')
                 ]);
-                mostrarRelevamientos(relevamientos);
+                mostrarRelevamientos(relevamientos, indexarSituacionesBarrios(barriosActuales));
                 document.getElementById('reports-total').textContent = resumen.total;
                 document.getElementById('reports-critical').textContent = resumen.criticos;
                 document.getElementById('reports-people').textContent = resumen.personasAfectadas;

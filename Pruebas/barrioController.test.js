@@ -1,5 +1,6 @@
 jest.mock('../models/Barrio', () => ({
     updateOne: jest.fn(),
+    updateMany: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
     findOneAndUpdate: jest.fn()
@@ -11,7 +12,11 @@ jest.mock('../relevamiento_territorial/models/Relevamiento', () => ({
 
 const Barrio = require('../models/Barrio');
 const Relevamiento = require('../relevamiento_territorial/models/Relevamiento');
-const { obtenerBarrios, eliminarBarrio } = require('../controllers/barrioController');
+const {
+    obtenerBarrios,
+    actualizarBarrio,
+    eliminarBarrio
+} = require('../controllers/barrioController');
 
 const consulta = (resultado) => ({
     sort: jest.fn().mockReturnThis(),
@@ -23,6 +28,7 @@ describe('Gestión de barrios', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         Barrio.updateOne.mockResolvedValue({});
+        Barrio.updateMany.mockResolvedValue({});
         Barrio.findOne.mockReturnValue(consulta({ orden: 3 }));
         Barrio.find.mockImplementation((filtro) => {
             const iniciales = [
@@ -57,12 +63,74 @@ describe('Gestión de barrios', () => {
             expect.objectContaining({
                 $setOnInsert: expect.objectContaining({
                     nombre: 'Barrio nuevo',
-                    coordenadas: { lat: -29.14, lng: -59.27 }
+                    coordenadas: { lat: -29.14, lng: -59.27 },
+                    situacion: 'estable'
                 })
             }),
             { upsert: true }
         );
         expect(Barrio.find).toHaveBeenLastCalledWith({ eliminado: { $ne: true } });
+        expect(Barrio.updateMany).toHaveBeenCalledWith(
+            { situacion: { $exists: false } },
+            { $set: { situacion: 'estable' } }
+        );
+    });
+
+    it('actualiza la situación del barrio si el administrador envía un valor permitido', async () => {
+        const barrioActualizado = {
+            clave: 'puerto-costanera',
+            nombre: 'Zona Puerto / Costanera',
+            situacion: 'critico'
+        };
+        Barrio.findOneAndUpdate.mockReturnValue({
+            lean: () => Promise.resolve(barrioActualizado)
+        });
+        const respuesta = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        await actualizarBarrio({
+            params: { clave: 'puerto-costanera' },
+            body: {
+                nombre: 'Zona Puerto / Costanera',
+                ubicacion: 'Puerto y Costanera de Goya',
+                situacion: 'critico'
+            }
+        }, respuesta);
+
+        expect(Barrio.findOneAndUpdate).toHaveBeenCalledWith(
+            { clave: 'puerto-costanera', eliminado: { $ne: true } },
+            {
+                $set: {
+                    nombre: 'Zona Puerto / Costanera',
+                    ubicacion: 'Puerto y Costanera de Goya',
+                    situacion: 'critico'
+                }
+            },
+            { new: true, runValidators: true }
+        );
+        expect(respuesta.status).toHaveBeenCalledWith(200);
+    });
+
+    it('rechaza una situación de barrio distinta de crítica o estable', async () => {
+        const respuesta = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        await actualizarBarrio({
+            params: { clave: 'puerto-costanera' },
+            body: {
+                nombre: 'Zona Puerto / Costanera',
+                ubicacion: 'Puerto y Costanera de Goya',
+                situacion: 'alerta',
+                coordenadas: { lat: -29.14, lng: -59.27 }
+            }
+        }, respuesta);
+
+        expect(respuesta.status).toHaveBeenCalledWith(400);
+        expect(Barrio.findOneAndUpdate).not.toHaveBeenCalled();
     });
 
     it('oculta un barrio eliminado sin borrar los relevamientos históricos', async () => {

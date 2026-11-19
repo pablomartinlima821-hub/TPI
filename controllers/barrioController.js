@@ -7,18 +7,21 @@ const BARRIOS_INICIALES = [
         clave: 'puerto-costanera',
         nombre: 'Zona Puerto / Costanera',
         ubicacion: 'Puerto y Costanera de Goya',
+        situacion: 'estable',
         orden: 1
     },
     {
         clave: 'matadero-riacho-goya',
         nombre: 'B° Matadero / Riacho Goya',
         ubicacion: 'Barrio Matadero, zona del Riacho Goya',
+        situacion: 'critico',
         orden: 2
     },
     {
         clave: 'paraje-el-bajo',
         nombre: 'Zona Paraje El Bajo',
         ubicacion: 'Paraje El Bajo',
+        situacion: 'estable',
         orden: 3
     }
 ];
@@ -33,6 +36,7 @@ const inicializarBarrios = async () => {
                         nombre: barrio.nombre,
                         ubicacion: barrio.ubicacion,
                         origenNombre: barrio.nombre,
+                        situacion: barrio.situacion,
                         orden: barrio.orden
                     }
                 },
@@ -41,6 +45,10 @@ const inicializarBarrios = async () => {
             await Barrio.updateOne(
                 { clave: barrio.clave, origenNombre: { $exists: false } },
                 { $set: { origenNombre: barrio.nombre } }
+            );
+            await Barrio.updateOne(
+                { clave: barrio.clave, situacion: { $exists: false } },
+                { $set: { situacion: barrio.situacion } }
             );
         } catch (error) {
             if (error.code !== 11000) throw error;
@@ -103,6 +111,7 @@ const importarBarriosRelevados = async () => {
                         ubicacion: 'Ubicación registrada en relevamientos',
                         origenNombre: nombre,
                         coordenadas: relevamiento.coordenadas || null,
+                        situacion: 'estable',
                         orden
                     }
                 },
@@ -120,6 +129,10 @@ const obtenerBarrios = async (req, res) => {
     try {
         await inicializarBarrios();
         await importarBarriosRelevados();
+        await Barrio.updateMany(
+            { situacion: { $exists: false } },
+            { $set: { situacion: 'estable' } }
+        );
         const barrios = await Barrio.find({ eliminado: { $ne: true } }).sort({ orden: 1 }).lean();
         return res.status(200).json(barrios);
     } catch (error) {
@@ -135,19 +148,31 @@ const actualizarBarrio = async (req, res) => {
     const lngTexto = req.body?.coordenadas?.lng;
     const lat = typeof latTexto === 'number' || typeof latTexto === 'string' ? Number(latTexto) : NaN;
     const lng = typeof lngTexto === 'number' || typeof lngTexto === 'string' ? Number(lngTexto) : NaN;
+    const situacion = req.body?.situacion;
+    const coordenadasIncluidas = latTexto !== undefined || lngTexto !== undefined;
+    const coordenadasInvalidas = coordenadasIncluidas &&
+        (!Number.isFinite(lat) || lat < -29.5 || lat > -29 ||
+            !Number.isFinite(lng) || lng < -59.5 || lng > -59);
 
     if (!nombre || nombre.length > 120 || !ubicacion || ubicacion.length > 300 ||
-        !Number.isFinite(lat) || lat < -29.5 || lat > -29 ||
-        !Number.isFinite(lng) || lng < -59.5 || lng > -59) {
+        coordenadasInvalidas ||
+        (situacion !== undefined && !['critico', 'estable'].includes(situacion))) {
         return res.status(400).json({
-            mensaje: 'Ingresa un nombre, una ubicación y coordenadas válidas dentro del área de Goya.'
+            mensaje: 'Ingresa un nombre, una ubicación, coordenadas válidas dentro del área de Goya (si las modificas, completa latitud y longitud) y una situación válida.'
         });
     }
 
     try {
         const barrio = await Barrio.findOneAndUpdate(
             { clave: req.params.clave, eliminado: { $ne: true } },
-            { $set: { nombre, ubicacion, coordenadas: { lat, lng } } },
+            {
+                $set: {
+                    nombre,
+                    ubicacion,
+                    ...(coordenadasIncluidas ? { coordenadas: { lat, lng } } : {}),
+                    ...(situacion ? { situacion } : {})
+                }
+            },
             { new: true, runValidators: true }
         ).lean();
 

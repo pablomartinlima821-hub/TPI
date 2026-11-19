@@ -50,7 +50,10 @@ monitoreo del río y administración de barrios.
 
 Los administradores pueden quitar barrios mal cargados de la lista. La baja es
 lógica para evitar que un barrio vuelva a aparecer por la importación automática
-de relevamientos; los relevamientos históricos asociados no se eliminan.
+de relevamientos; los relevamientos históricos asociados no se eliminan. También
+pueden marcar cada barrio como crítico o estable desde su formulario de edición.
+Esa situación actual se refleja también en los puntos del mapa del panel de
+relevamientos.
 
 ## Desarrollo local
 
