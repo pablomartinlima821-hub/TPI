@@ -111,7 +111,7 @@ const importarBarriosRelevados = async () => {
                         ubicacion: 'Ubicación registrada en relevamientos',
                         origenNombre: nombre,
                         coordenadas: relevamiento.coordenadas || null,
-                        situacion: 'estable',
+                        situacion: 'sin_datos',
                         orden
                     }
                 },
@@ -129,6 +129,10 @@ const obtenerBarrios = async (req, res) => {
     try {
         await inicializarBarrios();
         await importarBarriosRelevados();
+        await Barrio.updateMany(
+            { clave: /^relevamiento-/, situacion: { $exists: false } },
+            { $set: { situacion: 'sin_datos' } }
+        );
         await Barrio.updateMany(
             { situacion: { $exists: false } },
             { $set: { situacion: 'estable' } }
@@ -149,6 +153,9 @@ const actualizarBarrio = async (req, res) => {
     const lat = typeof latTexto === 'number' || typeof latTexto === 'string' ? Number(latTexto) : NaN;
     const lng = typeof lngTexto === 'number' || typeof lngTexto === 'string' ? Number(lngTexto) : NaN;
     const situacion = req.body?.situacion;
+    const motivoSituacion = typeof req.body?.motivoSituacion === 'string'
+        ? req.body.motivoSituacion.trim()
+        : '';
     const coordenadasIncluidas = latTexto !== undefined || lngTexto !== undefined;
     const coordenadasInvalidas = coordenadasIncluidas &&
         (!Number.isFinite(lat) || lat < -29.5 || lat > -29 ||
@@ -156,23 +163,46 @@ const actualizarBarrio = async (req, res) => {
 
     if (!nombre || nombre.length > 120 || !ubicacion || ubicacion.length > 300 ||
         coordenadasInvalidas ||
-        (situacion !== undefined && !['critico', 'estable'].includes(situacion))) {
+        (situacion !== undefined && !['critico', 'estable', 'sin_datos'].includes(situacion)) ||
+        motivoSituacion.length > 300) {
         return res.status(400).json({
             mensaje: 'Ingresa un nombre, una ubicación, coordenadas válidas dentro del área de Goya (si las modificas, completa latitud y longitud) y una situación válida.'
         });
     }
 
     try {
-        const barrio = await Barrio.findOneAndUpdate(
-            { clave: req.params.clave, eliminado: { $ne: true } },
-            {
-                $set: {
-                    nombre,
-                    ubicacion,
-                    ...(coordenadasIncluidas ? { coordenadas: { lat, lng } } : {}),
-                    ...(situacion ? { situacion } : {})
+        const filtro = { clave: req.params.clave, eliminado: { $ne: true } };
+        const barrioExistente = await Barrio.findOne(filtro).lean();
+        if (!barrioExistente) {
+            return res.status(404).json({ mensaje: 'No se encontró el barrio que quieres editar.' });
+        }
+
+        const actualizaciones = {
+            $set: {
+                nombre,
+                ubicacion,
+                ...(coordenadasIncluidas ? { coordenadas: { lat, lng } } : {}),
+                ...(situacion ? { situacion } : {})
+            }
+        };
+        if (situacion && situacion !== (barrioExistente.situacion || 'sin_datos')) {
+            actualizaciones.$push = {
+                historialSituacion: {
+                    situacionAnterior: barrioExistente.situacion || 'sin_datos',
+                    situacionNueva: situacion,
+                    motivo: motivoSituacion || 'Cambio manual de situación',
+                    actualizadoEn: new Date(),
+                    actualizadoPor: {
+                        id: req.usuarioAutenticado.id,
+                        email: req.usuarioAutenticado.email
+                    }
                 }
-            },
+            };
+        }
+
+        const barrio = await Barrio.findOneAndUpdate(
+            filtro,
+            actualizaciones,
             { new: true, runValidators: true }
         ).lean();
 

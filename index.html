@@ -268,7 +268,11 @@
                             <select name="situacion" required class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
                                 <option value="estable">Estable</option>
                                 <option value="critico">Crítico</option>
+                                <option value="sin_datos">Sin datos</option>
                             </select>
+                        </label>
+                        <label class="block text-xs text-slate-600 dark:text-slate-300">Motivo del cambio de situación
+                            <input name="motivoSituacion" maxlength="300" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm" placeholder="Opcional">
                         </label>
                         <p class="text-xs text-slate-500 dark:text-slate-400">Las coordenadas son opcionales; también puedes hacer clic en el mapa para seleccionarlas.</p>
                         <div class="grid grid-cols-2 gap-2">
@@ -311,7 +315,7 @@
                                     <p id="reports-total" class="text-2xl font-bold text-slate-800 dark:text-white">0</p>
                                 </article>
                                 <article class="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border dark:border-slate-600">
-                                    <p class="text-sm text-slate-500 dark:text-slate-300">Sobre umbral automático</p>
+                                    <p class="text-sm text-slate-500 dark:text-slate-300">Umbral de evacuación (7 m)</p>
                                     <p id="reports-critical" class="text-2xl font-bold text-red-600">0</p>
                                 </article>
                                 <article class="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border dark:border-slate-600">
@@ -335,8 +339,8 @@
                                     <label class="text-sm text-slate-700 dark:text-slate-200">Clasificación automática
                                         <select name="riesgo" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
                                             <option value="">Todas</option>
-                                            <option value="critico">Sobre el umbral (≥ 5,20 m)</option>
-                                            <option value="sin-alerta">Sin alerta automática</option>
+                                            <option value="critico">Evacuación (≥ 7,00 m)</option>
+                                            <option value="sin-alerta">Por debajo de 7,00 m</option>
                                         </select>
                                     </label>
                                     <button class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-2">Aplicar filtros</button>
@@ -347,10 +351,11 @@
                                 <section class="xl:col-span-2 bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl border dark:border-slate-600">
                                     <div class="flex flex-wrap justify-between items-center gap-2 mb-2">
                                         <h4 class="font-bold text-slate-800 dark:text-white">Mapa de reportes</h4>
-                                        <span class="text-xs text-slate-500 dark:text-slate-300">Rojo: barrio crítico · Verde: barrio estable · Gris: sin situación</span>
+                                        <span class="text-xs text-slate-500 dark:text-slate-300">Rojo: barrio crítico · Verde: barrio estable · Gris: sin datos</span>
                                     </div>
                                     <div id="reports-map" class="h-[480px] rounded-lg overflow-hidden bg-slate-200"></div>
                                     <p class="text-xs text-slate-500 dark:text-slate-300 mt-2">Haz clic en el mapa para seleccionar la ubicación del reporte.</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-300 mt-1">Los estados se sincronizan automáticamente cada minuto mientras el panel está abierto.</p>
                                 </section>
 
                                 <section id="new-report-section" class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border dark:border-slate-600">
@@ -361,7 +366,11 @@
                                             <input name="barrio" required maxlength="120" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
                                         </label>
                                         <label class="block text-sm text-slate-700 dark:text-slate-200">Nivel del río (m)
-                                            <input name="nivelRioParana" type="number" min="0" step="0.01" required class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                            <div class="mt-1 flex gap-2">
+                                                <input name="nivelRioParana" type="number" min="0" step="0.01" required class="min-w-0 flex-1 border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
+                                                <button type="button" onclick="cargarNivelRioActual()" class="shrink-0 bg-slate-600 hover:bg-slate-700 text-white rounded-lg px-3 text-xs">Usar Prefectura</button>
+                                            </div>
+                                            <span id="report-river-source" class="block mt-1 text-xs text-slate-500 dark:text-slate-400">Puedes cargar la última medición o ingresarla manualmente.</span>
                                         </label>
                                         <label class="block text-sm text-slate-700 dark:text-slate-200">Personas afectadas
                                             <input name="personasAfectadas" type="number" min="0" step="1" value="0" class="mt-1 w-full border dark:border-slate-500 bg-white dark:bg-slate-800 rounded-lg p-2">
@@ -382,7 +391,7 @@
                                         </label>
                                         <button class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-2 font-semibold">Guardar reporte</button>
                                     </form>
-                                    <p class="text-xs text-slate-500 dark:text-slate-300 mt-3">La clasificación usa el umbral del proyecto (5,20 m); no constituye una alerta oficial.</p>
+                                    <p class="text-xs text-slate-500 dark:text-slate-300 mt-3">La evacuación se clasifica desde los 7,00 m según el criterio del proyecto; no constituye una alerta oficial.</p>
                                 </section>
                             </div>
 
@@ -396,7 +405,8 @@
                                         <thead><tr class="border-b dark:border-slate-600">
                                             <th class="p-2">Fecha</th><th class="p-2">Zona</th><th class="p-2">Río</th>
                                             <th class="p-2">Personas</th><th class="p-2">Clasificación del reporte</th>
-                                            <th class="p-2">Situación actual del barrio</th><th class="p-2">Responsable</th>
+                                            <th class="p-2">Situación actual del barrio</th><th class="p-2">Seguimiento</th>
+                                            <th class="p-2">Responsable</th>
                                         </tr></thead>
                                         <tbody id="reports-rows"></tbody>
                                     </table>
@@ -416,7 +426,7 @@
                     <h2>Resumen de resultados</h2>
                     <div class="report-summary-grid">
                         <div class="report-summary-card">Reportes registrados<strong id="report-total">0</strong></div>
-                        <div class="report-summary-card">Sobre umbral automático<strong id="report-critical">0</strong></div>
+                        <div class="report-summary-card">Umbral de evacuación (7 m)<strong id="report-critical">0</strong></div>
                         <div class="report-summary-card">Personas afectadas reportadas<strong id="report-people">0</strong></div>
                     </div>
                     <p id="report-summary-text"></p>
@@ -437,6 +447,7 @@
                                 <th>Nivel del río</th>
                                 <th>Personas</th>
                                 <th>Clasificación</th>
+                                <th>Seguimiento</th>
                                 <th>Necesidades</th>
                                 <th>Observaciones</th>
                                 <th>Responsable</th>
@@ -448,7 +459,7 @@
                 </section>
 
                 <footer class="report-note">
-                    Clasificación automática conforme al umbral de 5,20 m definido por el proyecto; no constituye una alerta oficial.
+                    Clasificación automática de evacuación desde 7,00 m conforme al criterio del proyecto; no constituye una alerta oficial.
                 </footer>
             </section>
         </div>
@@ -470,6 +481,8 @@
         let selectedReportMarker = null;
         let riverStatusTimer = null;
         let riverStatusRequest = null;
+        let reportsRefreshTimer = null;
+        let reportsRefreshInProgress = false;
         let barrios = [];
         let barriosMarkerLayer = null;
         let editingBarrioClave = null;
@@ -539,18 +552,38 @@
                 nombre.textContent = barrio.nombre;
                 encabezado.appendChild(nombre);
 
-                const critico = barrio.situacion === 'critico';
+                const situacion = ['critico', 'estable', 'sin_datos'].includes(barrio.situacion)
+                    ? barrio.situacion
+                    : 'sin_datos';
+                const critico = situacion === 'critico';
+                const estable = situacion === 'estable';
                 const etiqueta = document.createElement('span');
                 etiqueta.className = critico
                     ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300 text-xs px-2 py-0.5 rounded-full font-medium shrink-0'
-                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 text-xs px-2 py-0.5 rounded-full font-medium shrink-0';
-                etiqueta.textContent = critico ? 'Crítico' : 'Estable';
+                    : estable
+                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 text-xs px-2 py-0.5 rounded-full font-medium shrink-0'
+                        : 'bg-slate-200 text-slate-700 dark:bg-slate-600 dark:text-slate-200 text-xs px-2 py-0.5 rounded-full font-medium shrink-0';
+                etiqueta.textContent = critico ? 'Crítico' : estable ? 'Estable' : 'Sin datos';
                 encabezado.appendChild(etiqueta);
 
                 const ubicacion = document.createElement('p');
                 ubicacion.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
                 ubicacion.textContent = `Ubicación: ${barrio.ubicacion}`;
                 tarjeta.append(encabezado, ubicacion);
+
+                const historial = Array.isArray(barrio.historialSituacion) ? barrio.historialSituacion : [];
+                const ultimoCambio = historial[historial.length - 1];
+                if (ultimoCambio) {
+                    const detalleCambio = document.createElement('p');
+                    detalleCambio.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
+                    const fecha = ultimoCambio.actualizadoEn
+                        ? new Date(ultimoCambio.actualizadoEn).toLocaleString('es-AR')
+                        : 'fecha no disponible';
+                    const autor = ultimoCambio.actualizadoPor?.email || 'administrador';
+                    detalleCambio.textContent =
+                        `Último cambio: ${fecha} · ${autor} · ${ultimoCambio.motivo || 'Sin motivo indicado'}`;
+                    tarjeta.appendChild(detalleCambio);
+                }
 
                 const lat = Number(barrio.coordenadas?.lat);
                 const lng = Number(barrio.coordenadas?.lng);
@@ -562,11 +595,11 @@
 
                     if (barriosMarkerLayer) {
                         const popup = document.createElement('strong');
-                        popup.textContent = `${barrio.nombre} · ${critico ? 'Crítico' : 'Estable'}`;
+                        popup.textContent = `${barrio.nombre} · ${critico ? 'Crítico' : estable ? 'Estable' : 'Sin datos'}`;
                         L.circleMarker([lat, lng], {
                             radius: 9,
-                            color: critico ? '#991b1b' : '#166534',
-                            fillColor: critico ? '#ef4444' : '#22c55e',
+                            color: critico ? '#991b1b' : estable ? '#166534' : '#475569',
+                            fillColor: critico ? '#ef4444' : estable ? '#22c55e' : '#94a3b8',
                             fillOpacity: 0.85
                         }).bindPopup(popup).addTo(barriosMarkerLayer);
                     }
@@ -629,7 +662,8 @@
             const formulario = document.getElementById('neighborhood-edit-form');
             formulario.querySelector('[name="nombre"]').value = barrio.nombre;
             formulario.querySelector('[name="ubicacion"]').value = barrio.ubicacion;
-            formulario.querySelector('[name="situacion"]').value = barrio.situacion || 'estable';
+            formulario.querySelector('[name="situacion"]').value = barrio.situacion || 'sin_datos';
+            formulario.querySelector('[name="motivoSituacion"]').value = '';
             formulario.querySelector('[name="lat"]').value = barrio.coordenadas?.lat ?? '';
             formulario.querySelector('[name="lng"]').value = barrio.coordenadas?.lng ?? '';
             formulario.classList.remove('hidden');
@@ -703,6 +737,7 @@
                             nombre: campos.get('nombre'),
                             ubicacion: campos.get('ubicacion'),
                             situacion: campos.get('situacion'),
+                            motivoSituacion: campos.get('motivoSituacion'),
                             ...(lat || lng ? {
                                 coordenadas: {
                                     lat: lat ? Number(lat) : null,
@@ -1054,6 +1089,26 @@
             if (marcador) marcador.openPopup();
         }
 
+        async function cargarNivelRioActual() {
+            const input = document.querySelector('#new-report-form [name="nivelRioParana"]');
+            const mensaje = document.getElementById('report-river-source');
+            try {
+                const response = await fetch(`${API_URL}/api/rio`);
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.medicion) {
+                    throw new Error(data.mensaje || 'No hay una medición de Prefectura disponible.');
+                }
+
+                input.value = Number(data.medicion.alturaMetros).toFixed(2);
+                input.dataset.origen = 'prefectura';
+                input.dataset.fechaMedicionRio = data.medicion.fechaMedicion;
+                mensaje.textContent =
+                    `Prefectura: ${data.medicion.fechaMedicionOrigen || formatReportDate(data.medicion.fechaMedicion)}. Puedes corregir el nivel manualmente.`;
+            } catch (error) {
+                mensaje.textContent = `${error.message} Puedes ingresar el nivel manualmente.`;
+            }
+        }
+
         function normalizarNombreBarrio(nombre) {
             return String(nombre || '')
                 .trim()
@@ -1073,6 +1128,14 @@
             return situaciones;
         }
 
+        function etiquetaEstadoSeguimiento(estado) {
+            return {
+                pendiente: 'Pendiente',
+                'en-seguimiento': 'En atención',
+                resuelto: 'Resuelto'
+            }[estado] || 'Pendiente';
+        }
+
         function mostrarRelevamientos(relevamientos, situacionesPorBarrio) {
             reportsMarkerLayer.clearLayers();
             const filas = document.getElementById('reports-rows');
@@ -1086,7 +1149,10 @@
                 );
                 const estadoBarrio = situacionBarrio === 'critico'
                     ? 'Crítico'
-                    : situacionBarrio === 'estable' ? 'Estable' : 'Sin situación';
+                    : situacionBarrio === 'estable'
+                        ? 'Estable'
+                        : situacionBarrio === 'sin_datos' ? 'Sin datos' : 'Barrio sin clasificar';
+                const estadoSeguimiento = etiquetaEstadoSeguimiento(relevamiento.estadoSeguimiento);
                 const lat = Number(relevamiento.coordenadas?.lat);
                 const lng = Number(relevamiento.coordenadas?.lng);
                 const coordenadasValidas = Number.isFinite(lat) && Number.isFinite(lng) &&
@@ -1112,8 +1178,12 @@
                         `<strong>${escapeReportHtml(relevamiento.barrio)}</strong><br>` +
                         `Situación actual del barrio: ${escapeReportHtml(estadoBarrio)}<br>` +
                         `Nivel: ${escapeReportHtml(relevamiento.nivelRioParana)} m<br>` +
+                        `Origen del nivel: ${relevamiento.nivelRioOrigen === 'prefectura'
+                            ? `Prefectura (${escapeReportHtml(formatReportDate(relevamiento.fechaMedicionRio))})`
+                            : 'Manual'}<br>` +
                         `Personas reportadas: ${escapeReportHtml(relevamiento.personasAfectadas || 0)}<br>` +
-                        `Clasificación del reporte: ${critico ? 'Sobre el umbral automático (5,20 m)' : 'Sin alerta automática'}<br>` +
+                        `Clasificación del reporte: ${critico ? 'Umbral de evacuación alcanzado (7,00 m)' : 'Por debajo del umbral de evacuación (7,00 m)'}<br>` +
+                        `Seguimiento: ${escapeReportHtml(estadoSeguimiento)}<br>` +
                         `Fecha: ${escapeReportHtml(formatReportDate(relevamiento.fechaRegistro))}`
                     );
                 } else {
@@ -1130,17 +1200,72 @@
                 [
                     formatReportDate(relevamiento.fechaRegistro),
                     relevamiento.barrio,
-                    `${relevamiento.nivelRioParana} m`,
+                    `${relevamiento.nivelRioParana} m (${relevamiento.nivelRioOrigen === 'prefectura'
+                        ? `Prefectura, ${formatReportDate(relevamiento.fechaMedicionRio)}`
+                        : 'manual'})`,
                     relevamiento.personasAfectadas || 0,
-                    critico ? 'Sobre el umbral' : 'Sin alerta automática',
-                    estadoBarrio,
-                    relevamiento.registradoPor?.nombre || relevamiento.registradoPor?.email || '—'
+                    critico ? 'Evacuación (≥ 7,00 m)' : 'Por debajo de 7,00 m',
+                    estadoBarrio
                 ].forEach((valor) => {
                     const celda = document.createElement('td');
                     celda.className = 'p-2';
                     celda.textContent = valor;
                     fila.appendChild(celda);
                 });
+
+                const seguimiento = document.createElement('td');
+                seguimiento.className = 'p-2';
+                const selectorSeguimiento = document.createElement('select');
+                selectorSeguimiento.className = 'border rounded p-1 text-xs dark:bg-slate-800 dark:border-slate-500';
+                [
+                    ['pendiente', 'Pendiente'],
+                    ['en-seguimiento', 'En atención'],
+                    ['resuelto', 'Resuelto']
+                ].forEach(([valor, etiqueta]) => {
+                    const opcion = document.createElement('option');
+                    opcion.value = valor;
+                    opcion.textContent = etiqueta;
+                    selectorSeguimiento.appendChild(opcion);
+                });
+                selectorSeguimiento.value = relevamiento.estadoSeguimiento || 'pendiente';
+                selectorSeguimiento.addEventListener('change', async () => {
+                    const anterior = relevamiento.estadoSeguimiento || 'pendiente';
+                    selectorSeguimiento.disabled = true;
+                    try {
+                        const resultado = await reportsApi(
+                            `/${encodeURIComponent(relevamiento._id)}/seguimiento`,
+                            {
+                                method: 'PATCH',
+                                body: JSON.stringify({ estadoSeguimiento: selectorSeguimiento.value })
+                            }
+                        );
+                        relevamiento.estadoSeguimiento = resultado.data.estadoSeguimiento;
+                        relevamiento.seguimientoActualizadoEn = resultado.data.seguimientoActualizadoEn;
+                        relevamiento.seguimientoActualizadoPor = resultado.data.seguimientoActualizadoPor;
+                        mostrarMensajeRelevamientos(resultado.mensaje);
+                    } catch (error) {
+                        selectorSeguimiento.value = anterior;
+                        mostrarMensajeRelevamientos(error.message, true);
+                    } finally {
+                        selectorSeguimiento.disabled = false;
+                    }
+                });
+                seguimiento.appendChild(selectorSeguimiento);
+                if (relevamiento.seguimientoActualizadoEn) {
+                    const detalle = document.createElement('small');
+                    detalle.className = 'block text-slate-500 dark:text-slate-400 mt-1';
+                    const fecha = formatReportDate(relevamiento.seguimientoActualizadoEn);
+                    const autor = relevamiento.seguimientoActualizadoPor?.email || 'administrador';
+                    detalle.textContent = `${fecha} · ${autor}`;
+                    seguimiento.appendChild(detalle);
+                }
+                fila.appendChild(seguimiento);
+
+                const responsable = document.createElement('td');
+                responsable.className = 'p-2';
+                responsable.textContent =
+                    relevamiento.registradoPor?.nombre || relevamiento.registradoPor?.email || '—';
+                fila.appendChild(responsable);
                 filas.appendChild(fila);
             });
 
@@ -1154,6 +1279,8 @@
         }
 
         async function actualizarPanelRelevamientos() {
+            if (reportsRefreshInProgress) return;
+            reportsRefreshInProgress = true;
             try {
                 const query = reportsFiltersQuery();
                 const [relevamientos, resumen, barriosActuales] = await Promise.all([
@@ -1171,6 +1298,8 @@
                 mostrarMensajeRelevamientos('Datos actualizados.');
             } catch (error) {
                 mostrarMensajeRelevamientos(error.message, true);
+            } finally {
+                reportsRefreshInProgress = false;
             }
         }
 
@@ -1188,7 +1317,7 @@
             document.getElementById('report-people').textContent = personasAfectadas.toLocaleString('es-AR');
             document.getElementById('report-summary-text').textContent =
                 `En la selección se registraron ${total.toLocaleString('es-AR')} relevamientos; ` +
-                `${criticos.toLocaleString('es-AR')} superan el umbral automático y se reportaron ` +
+                `${criticos.toLocaleString('es-AR')} alcanzan el umbral de evacuación y se reportaron ` +
                 `${personasAfectadas.toLocaleString('es-AR')} personas afectadas.`;
 
             const form = document.getElementById('reports-filter-form');
@@ -1226,7 +1355,8 @@
                         relevamiento.barrio,
                         `${relevamiento.nivelRioParana} m`,
                         relevamiento.personasAfectadas || 0,
-                        relevamiento.estadoEvacuacion ? 'Sobre umbral (≥ 5,20 m)' : 'Sin alerta automática',
+                        relevamiento.estadoEvacuacion ? 'Evacuación (≥ 7,00 m)' : 'Por debajo de 7,00 m',
+                        etiquetaEstadoSeguimiento(relevamiento.estadoSeguimiento),
                         relevamiento.necesidades || '—',
                         relevamiento.observaciones || '—',
                         relevamiento.registradoPor?.nombre || relevamiento.registradoPor?.email || '—'
@@ -1285,10 +1415,20 @@
             setTimeout(() => {
                 inicializarMapaRelevamientos();
                 actualizarPanelRelevamientos();
+                if (!document.querySelector('#new-report-form [name="nivelRioParana"]').value) {
+                    cargarNivelRioActual();
+                }
             }, 100);
+            if (!reportsRefreshTimer) {
+                reportsRefreshTimer = setInterval(actualizarPanelRelevamientos, 60 * 1000);
+            }
         }
 
         function volverDashboardPrincipal() {
+            if (reportsRefreshTimer) {
+                clearInterval(reportsRefreshTimer);
+                reportsRefreshTimer = null;
+            }
             document.getElementById('admin-reports-panel').classList.add('hidden');
             document.getElementById('dashboard-main-view').classList.remove('hidden');
             if (mapInstance) setTimeout(() => mapInstance.invalidateSize(), 100);
@@ -1326,6 +1466,13 @@
             actualizarPanelRelevamientos();
         });
 
+        const nivelRioInput = document.querySelector('#new-report-form [name="nivelRioParana"]');
+        nivelRioInput.addEventListener('input', () => {
+            nivelRioInput.dataset.origen = 'manual';
+            delete nivelRioInput.dataset.fechaMedicionRio;
+            document.getElementById('report-river-source').textContent = 'Nivel ingresado manualmente.';
+        });
+
         document.getElementById('new-report-form').addEventListener('submit', async (event) => {
             event.preventDefault();
             const form = event.currentTarget;
@@ -1337,6 +1484,7 @@
                     body: JSON.stringify({
                         barrio: campos.get('barrio'),
                         nivelRioParana: Number(campos.get('nivelRioParana')),
+                        nivelRioOrigen: nivelRioInput.dataset.origen || 'manual',
                         personasAfectadas: Number(campos.get('personasAfectadas') || 0),
                         necesidades: campos.get('necesidades'),
                         observaciones: campos.get('observaciones'),
@@ -1347,6 +1495,11 @@
                     })
                 });
                 form.reset();
+                nivelRioInput.dataset.origen = 'manual';
+                delete nivelRioInput.dataset.fechaMedicionRio;
+                document.getElementById('report-river-source').textContent =
+                    'Puedes cargar la última medición o ingresarla manualmente.';
+                cargarNivelRioActual();
                 if (selectedReportMarker) {
                     reportsMap.removeLayer(selectedReportMarker);
                     selectedReportMarker = null;
@@ -1393,6 +1546,10 @@
             if (riverStatusTimer) {
                 clearInterval(riverStatusTimer);
                 riverStatusTimer = null;
+            }
+            if (reportsRefreshTimer) {
+                clearInterval(reportsRefreshTimer);
+                reportsRefreshTimer = null;
             }
 
             if (mensaje) {

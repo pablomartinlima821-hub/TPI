@@ -64,7 +64,7 @@ describe('Gestión de barrios', () => {
                 $setOnInsert: expect.objectContaining({
                     nombre: 'Barrio nuevo',
                     coordenadas: { lat: -29.14, lng: -59.27 },
-                    situacion: 'estable'
+                    situacion: 'sin_datos'
                 })
             }),
             { upsert: true }
@@ -74,6 +74,10 @@ describe('Gestión de barrios', () => {
             { situacion: { $exists: false } },
             { $set: { situacion: 'estable' } }
         );
+        expect(Barrio.updateMany).toHaveBeenCalledWith(
+            { clave: /^relevamiento-/, situacion: { $exists: false } },
+            { $set: { situacion: 'sin_datos' } }
+        );
     });
 
     it('actualiza la situación del barrio si el administrador envía un valor permitido', async () => {
@@ -82,6 +86,9 @@ describe('Gestión de barrios', () => {
             nombre: 'Zona Puerto / Costanera',
             situacion: 'critico'
         };
+        Barrio.findOne.mockReturnValueOnce({
+            lean: () => Promise.resolve({ situacion: 'estable' })
+        });
         Barrio.findOneAndUpdate.mockReturnValue({
             lean: () => Promise.resolve(barrioActualizado)
         });
@@ -95,10 +102,16 @@ describe('Gestión de barrios', () => {
             body: {
                 nombre: 'Zona Puerto / Costanera',
                 ubicacion: 'Puerto y Costanera de Goya',
-                situacion: 'critico'
-            }
+                situacion: 'critico',
+                motivoSituacion: 'Reporte confirmado en el barrio'
+            },
+            usuarioAutenticado: { id: 'admin-id', email: 'admin@example.com' }
         }, respuesta);
 
+        expect(Barrio.findOne).toHaveBeenCalledWith({
+            clave: 'puerto-costanera',
+            eliminado: { $ne: true }
+        });
         expect(Barrio.findOneAndUpdate).toHaveBeenCalledWith(
             { clave: 'puerto-costanera', eliminado: { $ne: true } },
             {
@@ -106,6 +119,14 @@ describe('Gestión de barrios', () => {
                     nombre: 'Zona Puerto / Costanera',
                     ubicacion: 'Puerto y Costanera de Goya',
                     situacion: 'critico'
+                },
+                $push: {
+                    historialSituacion: expect.objectContaining({
+                        situacionAnterior: 'estable',
+                        situacionNueva: 'critico',
+                        motivo: 'Reporte confirmado en el barrio',
+                        actualizadoPor: { id: 'admin-id', email: 'admin@example.com' }
+                    })
                 }
             },
             { new: true, runValidators: true }

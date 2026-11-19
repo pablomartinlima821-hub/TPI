@@ -51,9 +51,16 @@ monitoreo del río y administración de barrios.
 Los administradores pueden quitar barrios mal cargados de la lista. La baja es
 lógica para evitar que un barrio vuelva a aparecer por la importación automática
 de relevamientos; los relevamientos históricos asociados no se eliminan. También
-pueden marcar cada barrio como crítico o estable desde su formulario de edición.
-Esa situación actual se refleja también en los puntos del mapa del panel de
-relevamientos.
+pueden marcar cada barrio como crítico, estable o sin datos desde su formulario
+de edición.
+Los barrios nuevos comienzan como “sin datos”, y los cambios de situación
+registran fecha, administrador y motivo. Esa situación se refleja también en
+los puntos del mapa del panel de relevamientos, sincronizado cada minuto mientras
+permanece abierto. Al cargar un relevamiento se puede usar el nivel más reciente
+guardado desde Prefectura o ingresar uno manualmente. Los administradores pueden
+seguir cada reporte como pendiente, en atención o resuelto. La clasificación de
+evacuación usa el umbral de 7 m definido por el proyecto; no es una alerta oficial
+ni modifica automáticamente la situación manual de los barrios.
 
 ## Desarrollo local
 
