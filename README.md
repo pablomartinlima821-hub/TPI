@@ -25,6 +25,7 @@ TPI/
 │   ├── routes/                    # Rutas de autenticación y relevamientos
 │   ├── Servicios/                 # Reglas de negocio del relevamiento
 │   └── Pruebas/                   # Pruebas de la API de relevamientos
+├── django_backend/                # Backend Django independiente
 ├── postman/                       # Recursos de Postman
 ├── .postman/                      # Configuración del espacio de trabajo Postman
 └── .vscode/                       # Configuración del editor para el proyecto
@@ -32,7 +33,18 @@ TPI/
 
 `node_modules/` contiene dependencias instaladas y no forma parte del código
 fuente. `.env` contiene configuración local y no debe compartirse ni subirse al
-control de versiones.
+control de versiones. `.env.example` documenta las variables necesarias sin
+incluir credenciales reales.
+
+Node.js y MongoDB son la fuente principal de los datos de la aplicación. Django
+se integra como servicio de reportes: Node envía métricas agregadas y Django
+calcula indicadores para el panel. El flujo no duplica datos personales ni
+relevamientos en la base SQLite.
+
+La arquitectura y el recorrido de presentación están en
+[docs/ARQUITECTURA.md](./docs/ARQUITECTURA.md) y
+[docs/GUION_PRESENTACION.md](./docs/GUION_PRESENTACION.md). El uso de la
+aplicación está descrito en [docs/GUIA_USUARIO.md](./docs/GUIA_USUARIO.md).
 
 ## Recorrido para entender el código
 
@@ -73,7 +85,7 @@ Instalar:
 
 - Git.
 - Node.js 24 o una versión compatible.
-- Python 3.14 o una versión compatible con Django 6.
+- Python 3.12 o posterior, compatible con Django 6.
 - MongoDB Community Server.
 
 Comprobar las instalaciones desde PowerShell:
@@ -94,12 +106,13 @@ MongoDB desde su aplicación o servicio de Windows antes de continuar.
 Si el proyecto está publicado en GitHub:
 
 ```powershell
-git clone <URL_DEL_REPOSITORIO>
-cd TPI
+git clone --recurse-submodules https://github.com/pablomartinlima821-hub/TPI.git TPI
+Set-Location TPI
 ```
 
-También se puede descargar como ZIP desde GitHub, extraerlo y abrir una terminal
-PowerShell dentro de la carpeta `TPI`.
+La opción `--recurse-submodules` descarga el módulo
+`relevamiento_territorial`, que contiene parte del backend Node. Si ya se había
+clonado sin esa opción, ejecutar `git submodule update --init --recursive`.
 
 No copiar ni subir el archivo `.env`: debe crearse nuevamente en cada máquina.
 
@@ -108,29 +121,28 @@ No copiar ni subir el archivo `.env`: debe crearse nuevamente en cada máquina.
 Desde la raíz del proyecto:
 
 ```powershell
-npm install
+npm ci
 ```
 
-### 4. Configurar MongoDB y las variables de entorno
+### 4. Configurar las variables de entorno
 
-Crear un archivo `.env` en la raíz del proyecto con este contenido:
+Crear el archivo local a partir de la plantilla:
 
-```dotenv
-MONGO_URI=mongodb://127.0.0.1:27017/tpi_relevamiento
-PORT=5000
-JWT_SECRET=cambiar-por-una-clave-secreta
-EMAIL_USER=
-EMAIL_PASS=
+```powershell
+Copy-Item .env.example .env
 ```
 
-`MONGO_URI` es obligatoria. Las variables `EMAIL_USER` y `EMAIL_PASS` solo son
-necesarias si se utiliza el envío de correos; pueden quedar vacías para probar
-el resto de la aplicación.
+Editar `.env` y reemplazar los valores de ejemplo por secretos aleatorios. En
+particular, `INTERNAL_API_TOKEN` debe conservar el mismo valor para Node y
+Django. `DJANGO_REPORTS_URL` se puede dejar como está para desarrollo local.
+No compartir ni subir este archivo.
+
+`EMAIL_USER` y `EMAIL_PASS` solo son necesarias para probar el envío de correo.
+
+### 5. Iniciar MongoDB
 
 Si se usa MongoDB Atlas, reemplazar `MONGO_URI` por la cadena de conexión
 proporcionada por Atlas y permitir el acceso desde la dirección IP del equipo.
-
-### 5. Iniciar MongoDB
 
 Con MongoDB instalado como servicio, puede iniciarse desde PowerShell como
 administrador:
@@ -148,90 +160,81 @@ Get-Service MongoDB
 También se puede iniciar MongoDB desde MongoDB Compass o desde el método usado
 durante el desarrollo del proyecto.
 
-### 6. Iniciar el servidor Node.js
+### 6. Preparar e iniciar Django
+
+En una terminal:
+
+```powershell
+Set-Location "C:\ruta\al\proyecto\TPI\django_backend"
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py runserver 127.0.0.1:8000
+```
+
+`createsuperuser` se ejecuta una sola vez. Si PowerShell bloquea la activación
+del entorno virtual, ejecutar `Set-ExecutionPolicy -Scope Process Bypass` y
+volver a activar `.venv`.
+
+### 7. Iniciar el servidor Node.js
 
 Desde la raíz del proyecto:
 
 ```powershell
-npm start
+npm run dev
 ```
 
-Para desarrollo con reinicio automático:
+Para iniciar el modo normal en lugar del modo de desarrollo:
 
 ```powershell
-npm run dev
+npm start
 ```
 
 El servidor debe quedar disponible en:
 
 - Aplicación web: http://localhost:5000/web
 - Comprobación del servidor: http://localhost:5000/
+- Comprobación Django: http://127.0.0.1:8000/api/health/
 
-Para detener el servidor, presionar `Ctrl+C` en la terminal.
+Para el resumen integrado, mantener ambos servidores ejecutándose en terminales
+separadas. Node seguirá atendiendo la página si Django se detiene, pero el
+endpoint de resumen responderá `503` hasta que Django vuelva a estar disponible.
 
-### 7. Instalar y iniciar Django
+### 8. Probar el panel de Django
 
-Django es un backend independiente que utiliza una base SQLite propia. Abrir una
-segunda terminal, ingresar a la carpeta y crear un entorno virtual:
-
-```powershell
-cd C:\ruta\al\proyecto\TPI\django_backend
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-```
-
-Si PowerShell impide la activación del entorno virtual, habilitar temporariamente
-la ejecución para la sesión:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.venv\Scripts\Activate.ps1
-```
-
-Crear las tablas y iniciar el servidor:
-
-```powershell
-python manage.py migrate
-python manage.py runserver
-```
-
-La interfaz y los endpoints de Django estarán disponibles en:
+El superusuario creado en el paso de preparación es independiente de las
+cuentas de Node. Iniciar sesión en:
 
 - Panel administrativo: http://127.0.0.1:8000/admin/
 - Estado de Django: http://127.0.0.1:8000/api/health/
-- API de relevamientos: http://127.0.0.1:8000/api/relevamientos/
 
-Para detener Django, presionar `Ctrl+C` en esa terminal.
+La ruta interna `POST /api/internal/reportes/resumen/` requiere el encabezado
+`X-Internal-Token`; solo Node debe invocarla. El token no se incluye en el
+frontend ni en el repositorio.
 
-### 8. Crear el usuario administrador de Django
+El CRUD autónomo de `/api/relevamientos/` de Django es una API de demostración
+que guarda en `django_backend/db.sqlite3`; la página principal no la consume.
+Para el flujo integrado, la fuente oficial es MongoDB y Django procesa solo las
+métricas que Node le envía.
 
-Con el servidor detenido, desde `django_backend` y con el entorno virtual activo:
-
-```powershell
-python manage.py createsuperuser
-```
-
-Ingresar el nombre de usuario, el correo y la contraseña solicitados. Luego
-volver a iniciar Django:
-
-```powershell
-python manage.py runserver
-```
-
-Abrir http://127.0.0.1:8000/admin/ e iniciar sesión con esos datos.
-
-### 9. Ejecutar las pruebas
+### 9. Ejecutar pruebas y medir cobertura
 
 Desde la raíz del proyecto:
 
 ```powershell
 npm test
+npm run test:coverage
 ```
 
-Desde la carpeta `django_backend`, con el entorno virtual activo:
+Desde `django_backend`, con el entorno virtual activo:
 
 ```powershell
-python manage.py test
+python -m coverage run --branch --source=api manage.py test
+python -m coverage report --fail-under=85
 ```
+
+Jest aplica umbrales mínimos globales de 65% de sentencias, 45% de ramas,
+70% de funciones y 68% de líneas. Los resultados detallados se generan
+localmente y no se suben al repositorio.

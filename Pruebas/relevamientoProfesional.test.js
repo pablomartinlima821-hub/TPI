@@ -15,16 +15,24 @@ jest.mock('../relevamiento_territorial/models/Relevamiento', () => {
     });
     Relevamiento.prototype.save = jest.fn();
     Relevamiento.findByIdAndUpdate = jest.fn();
+    Relevamiento.aggregate = jest.fn();
+    Relevamiento.findOne = jest.fn();
     return Relevamiento;
 });
+
+jest.mock('../services/djangoReportService', () => ({
+    generarResumenTerritorial: jest.fn()
+}));
 
 const Usuario = require('../relevamiento_territorial/models/Usuario');
 const MedicionRio = require('../models/MedicionRio');
 const Relevamiento = require('../relevamiento_territorial/models/Relevamiento');
+const { generarResumenTerritorial } = require('../services/djangoReportService');
 const app = require('../app');
 const { evaluarRiesgoEvacuacion } = require('../relevamiento_territorial/Servicios/relevamientoServicio');
 const {
     crearRegistro,
+    obtenerResumen,
     actualizarSeguimiento
 } = require('../relevamiento_territorial/controllers/surveyController');
 
@@ -36,10 +44,15 @@ const respuesta = () => ({
 describe('Mejoras profesionales de relevamientos', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        generarResumenTerritorial.mockReset();
         Usuario.findById.mockReturnValue({
             select: jest.fn().mockResolvedValue({ nombre: 'Encuestador', email: 'campo@example.com' })
         });
         Relevamiento.prototype.save.mockResolvedValue();
+    });
+
+    afterEach(() => {
+        jest.restoreAllMocks();
     });
 
     it('guarda el nivel de río actual de Prefectura en el nuevo relevamiento', async () => {
@@ -117,7 +130,7 @@ describe('Mejoras profesionales de relevamientos', () => {
     it('solo permite a administradores cambiar el seguimiento', async () => {
         const token = jwt.sign(
             { id: 'usuario-id', email: 'campo@example.com', rol: 'encuestador' },
-            process.env.JWT_SECRET || 'secreto_super_seguro'
+            process.env.JWT_SECRET
         );
 
         const response = await request(app)
@@ -127,5 +140,91 @@ describe('Mejoras profesionales de relevamientos', () => {
 
         expect(response.statusCode).toBe(403);
         expect(Relevamiento.findByIdAndUpdate).not.toHaveBeenCalled();
+    });
+
+    it('solo permite a administradores consultar el resumen', async () => {
+        const token = jwt.sign(
+            { id: 'usuario-id', email: 'campo@example.com', rol: 'encuestador' },
+            process.env.JWT_SECRET
+        );
+
+        const response = await request(app)
+            .get('/api/relevamientos/resumen')
+            .set('Authorization', `Bearer ${token}`);
+
+        expect(response.statusCode).toBe(403);
+        expect(generarResumenTerritorial).not.toHaveBeenCalled();
+    });
+
+    it('no autentica tokens si falta la clave del servidor', async () => {
+        const token = jwt.sign(
+            { id: 'usuario-id', email: 'campo@example.com', rol: 'admin' },
+            process.env.JWT_SECRET
+        );
+        const jwtSecret = process.env.JWT_SECRET;
+        delete process.env.JWT_SECRET;
+        const logError = jest.spyOn(console, 'error').mockImplementation();
+
+        try {
+            const response = await request(app)
+                .get('/api/relevamientos/resumen')
+                .set('Authorization', `Bearer ${token}`);
+
+            expect(response.statusCode).toBe(500);
+            expect(response.body.mensaje).toBe('El servicio de autenticación no está configurado.');
+        } finally {
+            process.env.JWT_SECRET = jwtSecret;
+            logError.mockRestore();
+        }
+    });
+
+    it('envía métricas agregadas de MongoDB a Django y conserva el resumen para el panel', async () => {
+        const ultimo = {
+            barrio: 'Centro',
+            fechaRegistro: new Date('2026-11-19T12:00:00.000Z')
+        };
+        Relevamiento.aggregate.mockResolvedValue([
+            { _id: 'Centro', total: 2, criticos: 1, personasAfectadas: 4 }
+        ]);
+        Relevamiento.findOne.mockReturnValue({
+            sort: jest.fn().mockReturnThis(),
+            select: jest.fn().mockReturnThis(),
+            lean: jest.fn().mockResolvedValue(ultimo)
+        });
+        const resumen = {
+            total: 2,
+            criticos: 1,
+            personasAfectadas: 4,
+            ultimo,
+            porcentajeCriticos: 50,
+            barriosPrioritarios: [],
+            procesadoPor: 'django'
+        };
+        generarResumenTerritorial.mockResolvedValue(resumen);
+        const res = respuesta();
+
+        await obtenerResumen({ query: { barrio: 'Centro' } }, res);
+
+        expect(generarResumenTerritorial).toHaveBeenCalledWith({
+            barrios: [{ barrio: 'Centro', total: 2, criticos: 1, personasAfectadas: 4 }],
+            ultimo
+        });
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith(resumen);
+    });
+
+    it('devuelve 503 explícito si el servicio de reportes Django no está disponible', async () => {
+        const error = new Error('Django no responde');
+        error.statusCode = 503;
+        generarResumenTerritorial.mockRejectedValue(error);
+        const logError = jest.spyOn(console, 'error').mockImplementation();
+        const res = respuesta();
+
+        await obtenerResumen({ query: {} }, res);
+
+        expect(res.status).toHaveBeenCalledWith(503);
+        expect(res.json).toHaveBeenCalledWith({
+            mensaje: 'El servicio Django no pudo generar el resumen territorial.'
+        });
     });
 });

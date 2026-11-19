@@ -1,0 +1,3 @@
+[submodule "relevamiento_territorial"]
+	path = relevamiento_territorial
+	url = https://github.com/pablomartinlima821-hub/relevamiento_territorial.git

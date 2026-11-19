@@ -1315,10 +1315,19 @@
             document.getElementById('report-total').textContent = total.toLocaleString('es-AR');
             document.getElementById('report-critical').textContent = criticos.toLocaleString('es-AR');
             document.getElementById('report-people').textContent = personasAfectadas.toLocaleString('es-AR');
+            const porcentajeCriticos = Number(resumen.porcentajeCriticos || 0);
+            const barrioPrioritario = Array.isArray(resumen.barriosPrioritarios)
+                ? resumen.barriosPrioritarios[0]
+                : null;
             document.getElementById('report-summary-text').textContent =
                 `En la selección se registraron ${total.toLocaleString('es-AR')} relevamientos; ` +
                 `${criticos.toLocaleString('es-AR')} alcanzan el umbral de evacuación y se reportaron ` +
-                `${personasAfectadas.toLocaleString('es-AR')} personas afectadas.`;
+                `${personasAfectadas.toLocaleString('es-AR')} personas afectadas. ` +
+                `El ${porcentajeCriticos.toLocaleString('es-AR')}% es crítico; resumen calculado por Django ` +
+                `con datos de Node.js.` +
+                (barrioPrioritario
+                    ? ` Barrio prioritario por personas afectadas: ${barrioPrioritario.barrio}.`
+                    : '');
 
             const form = document.getElementById('reports-filter-form');
             const filtros = new FormData(form);

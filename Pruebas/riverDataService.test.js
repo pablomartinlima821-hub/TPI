@@ -118,7 +118,7 @@ describe('Datos de altura de Prefectura Naval Argentina', () => {
             .mockResolvedValue();
         const token = jwt.sign(
             { id: '507f1f77bcf86cd799439011', email: usuario.email },
-            process.env.JWT_SECRET || 'secreto_super_seguro'
+            process.env.JWT_SECRET
         );
 
         try {

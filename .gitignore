@@ -1,5 +1,8 @@
 node_modules/
 .env
+coverage/
+.coverage
+htmlcov/
 django_backend/db.sqlite3
 django_backend/__pycache__/
 django_backend/**/__pycache__/
