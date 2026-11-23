@@ -137,7 +137,10 @@ particular, `INTERNAL_API_TOKEN` debe conservar el mismo valor para Node y
 Django. `DJANGO_REPORTS_URL` se puede dejar como está para desarrollo local.
 No compartir ni subir este archivo.
 
-`EMAIL_USER` y `EMAIL_PASS` solo son necesarias para probar el envío de correo.
+Para recuperar contraseñas, crear una clave API en Brevo y verificar allí la
+dirección remitente. Configurar `BREVO_API_KEY` con la clave y `EMAIL_FROM` con
+esa dirección. El envío se realiza por HTTPS, compatible con el plan gratuito
+de Render. No subir la clave al repositorio.
 
 ### 5. Iniciar MongoDB
 
@@ -262,6 +265,8 @@ Durante la configuración, completar manualmente:
   Node, por ejemplo `https://tpi-node.onrender.com`.
 - `DJANGO_REPORTS_URL` en `tpi-node` con la URL interna pública de Django,
   por ejemplo `https://tpi-django.onrender.com/api/internal/reportes/resumen/`.
+- `BREVO_API_KEY` en `tpi-node` con una clave API de Brevo.
+- `EMAIL_FROM` en `tpi-node` con la dirección de remitente verificada en Brevo.
 
 Render genera automáticamente las claves `JWT_SECRET`, `DJANGO_SECRET_KEY` y
 `INTERNAL_API_TOKEN`. El último se comparte entre Node y Django.

@@ -186,8 +186,8 @@
                     <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Correo Electrónico:</label>
                     <input type="email" id="rec-email" placeholder="tu_correo@gmail.com" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
-                <button onclick="solicitarTokenRecuperacion()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 rounded-lg transition-colors shadow-md">
-                    Enviar Token por Gmail
+                <button id="recovery-send-token" onclick="solicitarTokenRecuperacion()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 rounded-lg transition-colors shadow-md">
+                    Enviar código por correo
                 </button>
 
                 <div id="recovery-token-section" class="hidden space-y-3 pt-4 border-t dark:border-slate-700">
@@ -978,8 +978,9 @@
         }
 
         async function solicitarTokenRecuperacion() {
-            const email = document.getElementById('rec-email').value;
+            const email = document.getElementById('rec-email').value.trim();
             const msg = document.getElementById('auth-msg');
+            const boton = document.getElementById('recovery-send-token');
 
             if (!email) {
                 msg.className = "text-center text-sm mt-4 font-medium text-red-500";
@@ -987,25 +988,30 @@
                 return;
             }
 
+            boton.disabled = true;
+            boton.textContent = 'Enviando código...';
             try {
                 const response = await fetch(`${API_URL}/api/auth/solicitar-codigo`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
                 });
-                const data = await response.json();
+                const data = await response.json().catch(() => ({}));
 
                 if (response.ok) {
                     msg.className = "text-center text-sm mt-4 font-medium text-emerald-600";
-                    msg.innerText = "¡Código enviado! Revisa tu correo.";
+                    msg.innerText = data.mensaje || "¡Código enviado! Revisa tu correo.";
                     document.getElementById('recovery-token-section').classList.remove('hidden');
                 } else {
                     msg.className = "text-center text-sm mt-4 font-medium text-red-500";
-                    msg.innerText = data.mensaje || "El correo no está registrado.";
+                    msg.innerText = data.mensaje || "No se pudo enviar el código.";
                 }
             } catch (error) {
                 msg.className = "text-center text-sm mt-4 font-medium text-red-500";
-                msg.innerText = "Error de conexión con el servidor.";
+                msg.innerText = "No se pudo conectar con el servidor. Intenta nuevamente.";
+            } finally {
+                boton.disabled = false;
+                boton.textContent = 'Enviar código por correo';
             }
         }
 

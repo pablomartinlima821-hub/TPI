@@ -1,7 +1,7 @@
 const Usuario = require('../models/Usuario');
-const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const obtenerJwtSecret = (res) => {
     if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
@@ -75,44 +75,72 @@ const iniciarSesion = async (req, res) => {
     }
 };
 
-// Configuración del transporter de correo (Gmail)
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.EMAIL_USER, // Tu correo configurado en el .env
-        pass: process.env.EMAIL_PASS  // Tu contraseña de aplicación de Gmail
-    }
-});
-
-// 1. Solicitar código de acceso por Gmail
-const solicitarTokenGmail = async (req, res) => {
+const solicitarCodigoRecuperacion = async (req, res) => {
     try {
-        const { email } = req.body;
-        let usuario = await Usuario.findOne({ email });
+        const email = typeof req.body?.email === 'string'
+            ? req.body.email.trim().toLowerCase()
+            : '';
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            return res.status(400).json({ mensaje: 'Ingresa un correo electrónico válido.' });
+        }
+        if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM) {
+            return res.status(503).json({
+                mensaje: 'El envío de códigos no está configurado. Contacta al administrador.'
+            });
+        }
 
+        const usuario = await Usuario.findOne({ email });
         if (!usuario) {
             return res.status(404).json({ mensaje: 'Correo no registrado en el sistema de relevamiento.' });
         }
 
-        // Generar código aleatorio de 6 dígitos
-        const codigoToken = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // Expira en 10 minutos
+        const codigoToken = crypto.randomInt(100000, 1000000).toString();
         usuario.tokenAcceso = codigoToken;
         usuario.tokenExpiracion = Date.now() + 10 * 60 * 1000;
         await usuario.save();
 
-        // Enviar correo
-        await transporter.sendMail({
-            from: '"Monitoreo Goya - El Niño" <noreply@goya.gov.ar>',
-            to: email,
-            subject: 'Código de Acceso - Relevamiento Territorial',
-            text: `Tu código de acceso temporal es: ${codigoToken}. Este código expira en 10 minutos.`
-        });
+        try {
+            const respuesta = await fetch('https://api.brevo.com/v3/smtp/email', {
+                method: 'POST',
+                signal: AbortSignal.timeout(15000),
+                headers: {
+                    accept: 'application/json',
+                    'api-key': process.env.BREVO_API_KEY,
+                    'content-type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sender: { name: 'Monitoreo Territorial de Goya', email: process.env.EMAIL_FROM },
+                    to: [{ email }],
+                    subject: 'Código para recuperar tu contraseña',
+                    textContent: `Tu código temporal es: ${codigoToken}. Este código expira en 10 minutos.`
+                })
+            });
+            if (!respuesta.ok) {
+                console.error(`Brevo rechazó el envío del código (HTTP ${respuesta.status}).`);
+                throw new Error('Brevo rechazó el envío del correo.');
+            }
+        } catch (error) {
+            usuario.tokenAcceso = undefined;
+            usuario.tokenExpiracion = undefined;
+            try {
+                await usuario.save();
+            } catch (errorLimpieza) {
+                console.error(`No se pudo limpiar el código de recuperación: ${errorLimpieza.message}`);
+            }
 
-        res.status(200).json({ mensaje: 'Código de acceso enviado con éxito a tu correo.' });
+            const tiempoAgotado = error.name === 'TimeoutError' || error.name === 'AbortError';
+            console.error(`No se pudo enviar el código de recuperación: ${error.message}`);
+            return res.status(tiempoAgotado ? 504 : 502).json({
+                mensaje: tiempoAgotado
+                    ? 'El envío del correo tardó demasiado. Intenta nuevamente.'
+                    : 'No se pudo enviar el correo. Verifica la configuración del remitente en Brevo.'
+            });
+        }
+
+        return res.status(200).json({ mensaje: 'Código enviado. Revisa tu correo.' });
     } catch (error) {
-        res.status(500).json({ mensaje: 'Error al enviar el correo', error: error.message });
+        console.error(`Error al solicitar el código de recuperación: ${error.message}`);
+        return res.status(500).json({ mensaje: 'No se pudo solicitar el código de recuperación.' });
     }
 };
 
@@ -176,4 +204,10 @@ const restablecerPassword = async (req, res) => {
     }
 };
 
-module.exports = { iniciarSesion, registrarUsuario, restablecerPassword, solicitarTokenGmail, verificarTokenGmail };
+module.exports = {
+    iniciarSesion,
+    registrarUsuario,
+    restablecerPassword,
+    solicitarCodigoRecuperacion,
+    verificarTokenGmail
+};
