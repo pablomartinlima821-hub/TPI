@@ -1,4 +1,6 @@
 const MedicionRio = require('../models/MedicionRio');
+const https = require('https');
+const crypto = require('crypto');
 
 const FUENTE_URL = 'https://contenidosweb.prefecturanaval.gob.ar/alturas/';
 const ESTACION = 'GOYA';
@@ -16,6 +18,37 @@ const estadoSincronizacion = {
 
 let temporizador = null;
 let sincronizacionEnCurso = null;
+
+const consultarMedianteHttps = () => new Promise((resolve, reject) => {
+    const agente = new https.Agent({
+        rejectUnauthorized: true,
+        secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT
+    });
+    const solicitud = https.get(FUENTE_URL, {
+        agent: agente,
+        headers: {
+            Accept: 'text/html',
+            'User-Agent': 'Mozilla/5.0 (compatible; TPI-Monitoreo/1.0)'
+        }
+    }, (respuesta) => {
+        let cuerpo = '';
+        respuesta.setEncoding('utf8');
+        respuesta.on('data', (fragmento) => {
+            cuerpo += fragmento;
+        });
+        respuesta.on('end', () => {
+            if (respuesta.statusCode < 200 || respuesta.statusCode >= 300) {
+                reject(new Error(`Prefectura respondió con estado HTTP ${respuesta.statusCode}.`));
+                return;
+            }
+            resolve(cuerpo);
+        });
+    });
+    solicitud.setTimeout(15000, () => {
+        solicitud.destroy(new Error('La consulta a Prefectura excedió el tiempo límite.'));
+    });
+    solicitud.on('error', reject);
+});
 
 const normalizarTexto = (valor) => valor
     .replace(/<[^>]*>/g, ' ')
@@ -123,13 +156,21 @@ async function consultarYGuardarMedicion() {
             let ultimoError;
             for (let intento = 1; intento <= 2; intento++) {
                 try {
-                    respuesta = await fetch(FUENTE_URL, {
-                        signal: AbortSignal.timeout(15000),
-                        headers: {
-                            Accept: 'text/html',
-                            'User-Agent': 'Mozilla/5.0 (compatible; TPI-Monitoreo/1.0)'
-                        }
-                    });
+                    try {
+                        respuesta = await fetch(FUENTE_URL, {
+                            signal: AbortSignal.timeout(15000),
+                            headers: {
+                                Accept: 'text/html',
+                                'User-Agent': 'Mozilla/5.0 (compatible; TPI-Monitoreo/1.0)'
+                            }
+                        });
+                    } catch (error) {
+                        const cuerpoHttps = await consultarMedianteHttps();
+                        respuesta = {
+                            ok: true,
+                            text: async () => cuerpoHttps
+                        };
+                    }
                     break;
                 } catch (error) {
                     ultimoError = error;
