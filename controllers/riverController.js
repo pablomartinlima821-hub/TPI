@@ -3,6 +3,7 @@ const { ESTACION, obtenerEstadoSincronizacion } = require('../services/riverData
 
 const obtenerEstadoRio = async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store');
         const medicion = await MedicionRio.findOne({ estacion: ESTACION })
             .sort({ fechaMedicion: -1 })
             .lean();

@@ -771,6 +771,7 @@
                 const advertencia = document.getElementById('river-sync-warning');
                 try {
                     const response = await fetch(`${API_URL}/api/rio`, {
+                        cache: 'no-store',
                         headers: { Authorization: `******'token')}` }
                     });
                     const data = await response.json().catch(() => ({}));
