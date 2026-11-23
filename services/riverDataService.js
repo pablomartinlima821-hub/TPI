@@ -1,6 +1,7 @@
 const MedicionRio = require('../models/MedicionRio');
 const https = require('https');
 const crypto = require('crypto');
+const dns = require('dns');
 
 const FUENTE_URL = 'https://contenidosweb.prefecturanaval.gob.ar/alturas/';
 const ESTACION = 'GOYA';
@@ -19,9 +20,15 @@ const estadoSincronizacion = {
 let temporizador = null;
 let sincronizacionEnCurso = null;
 
+const buscarIpv4 = (hostname, opciones, callback) => {
+    dns.lookup(hostname, { ...opciones, family: 4, all: false }, callback);
+};
+
 const consultarMedianteHttps = () => new Promise((resolve, reject) => {
     const agente = new https.Agent({
         rejectUnauthorized: true,
+        family: 4,
+        keepAlive: false,
         secureOptions: crypto.constants.SSL_OP_LEGACY_SERVER_CONNECT
     });
     const solicitud = https.get(FUENTE_URL, {
@@ -29,7 +36,8 @@ const consultarMedianteHttps = () => new Promise((resolve, reject) => {
         headers: {
             Accept: 'text/html',
             'User-Agent': 'Mozilla/5.0 (compatible; TPI-Monitoreo/1.0)'
-        }
+        },
+        lookup: buscarIpv4
     }, (respuesta) => {
         let cuerpo = '';
         respuesta.setEncoding('utf8');
@@ -44,7 +52,7 @@ const consultarMedianteHttps = () => new Promise((resolve, reject) => {
             resolve(cuerpo);
         });
     });
-    solicitud.setTimeout(15000, () => {
+    solicitud.setTimeout(20000, () => {
         solicitud.destroy(new Error('La consulta a Prefectura excedió el tiempo límite.'));
     });
     solicitud.on('error', reject);
@@ -154,11 +162,13 @@ async function consultarYGuardarMedicion() {
         try {
             let respuesta;
             let ultimoError;
-            for (let intento = 1; intento <= 2; intento++) {
+            for (let intento = 1; intento <= 3; intento++) {
                 try {
                     try {
                         respuesta = await fetch(FUENTE_URL, {
                             signal: AbortSignal.timeout(15000),
+                            cache: 'no-store',
+                            redirect: 'follow',
                             headers: {
                                 Accept: 'text/html',
                                 'User-Agent': 'Mozilla/5.0 (compatible; TPI-Monitoreo/1.0)'
@@ -174,8 +184,8 @@ async function consultarYGuardarMedicion() {
                     break;
                 } catch (error) {
                     ultimoError = error;
-                    if (intento === 1) {
-                        await new Promise((resolve) => setTimeout(resolve, 1000));
+                    if (intento < 3) {
+                        await new Promise((resolve) => setTimeout(resolve, intento * 1000));
                     }
                 }
             }

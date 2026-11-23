@@ -9,6 +9,7 @@ const {
 const request = require('supertest');
 const jwt = require('jsonwebtoken');
 const app = require('../app');
+const { sincronizacionParaMedicion } = require('../controllers/riverController');
 
 describe('Datos de altura de Prefectura Naval Argentina', () => {
     const paginaPrefectura = `
@@ -111,6 +112,16 @@ describe('Datos de altura de Prefectura Naval Argentina', () => {
         } finally {
             buscarMedicion.mockRestore();
         }
+    });
+
+    it('oculta un error temporal si conserva una medición consultada recientemente', () => {
+        const sincronizacion = {
+            intervaloMinutos: 15,
+            ultimoError: 'connect ETIMEDOUT 192.231.120.130:443'
+        };
+        const medicion = { consultadoEn: new Date(Date.now() - 5 * 60 * 1000) };
+
+        expect(sincronizacionParaMedicion(sincronizacion, medicion).ultimoError).toBeNull();
     });
 
     it('guarda en MongoDB un relevamiento ingresado con un barrio nuevo', async () => {
