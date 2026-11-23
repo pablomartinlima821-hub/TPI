@@ -3,7 +3,7 @@ services:
     name: tpi-node
     runtime: node
     plan: free
-    buildCommand: npm ci
+    buildCommand: git submodule update --init --recursive && npm ci
     startCommand: npm start
     healthCheckPath: /
     envVars:
