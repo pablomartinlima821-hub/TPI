@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: tpi-node
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DJANGO_REPORTS_URL
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - fromGroup: tpi-django-shared
+
+  - type: web
+    name: tpi-django
+    runtime: python
+    plan: free
+    buildCommand: pip install -r django_backend/requirements.txt && python django_backend/manage.py collectstatic --noinput
+    startCommand: python django_backend/manage.py migrate && gunicorn config.wsgi:application --chdir django_backend --bind 0.0.0.0:$PORT
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: false
+      - key: DJANGO_ALLOWED_HOSTS
+        sync: false
+      - key: DJANGO_CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - fromGroup: tpi-django-shared
+
+envVarGroups:
+  - name: tpi-django-shared
+    envVars:
+      - key: INTERNAL_API_TOKEN
+        generateValue: true

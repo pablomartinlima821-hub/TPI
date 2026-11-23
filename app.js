@@ -11,6 +11,7 @@ app.use(express.json());
 
 // Rutas de la API
 app.use('/api/auth', require('./relevamiento_territorial/routes/authRoutes'));
+app.use('/api/usuarios', require('./relevamiento_territorial/routes/usuarioRoutes'));
 app.use('/api/relevamientos', require('./relevamiento_territorial/routes/surveyRoutes'));
 app.use('/api/rio', require('./routes/riverRoutes'));
 app.use('/api/barrios', require('./routes/barrioRoutes'));

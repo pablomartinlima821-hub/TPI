@@ -59,6 +59,8 @@ está disponible, Node informa un error `503`/`502`; no inventa un resumen.
 | Node | `GET /web` | Página web |
 | Node | `GET /api/relevamientos/resumen` | JWT de administrador; integra con Django |
 | Node | `GET/POST /api/relevamientos` | JWT según rol |
+| Node | `GET /api/usuarios`, `GET /api/usuarios/:id` | JWT de administrador |
+| Node | `PATCH /api/usuarios/:id`, `DELETE /api/usuarios/:id` | JWT de administrador |
 | Django | `GET /api/health/` | Pública; verificación de disponibilidad |
 | Django | `POST /api/internal/reportes/resumen/` | Token interno Node→Django |
 | Django | `/admin/` | Usuario superadministrador Django |
@@ -66,6 +68,13 @@ está disponible, Node informa un error `503`/`502`; no inventa un resumen.
 
 Las cuentas de Node (JWT/MongoDB) y el superusuario de Django son identidades
 separadas. Crear una cuenta en uno no crea una cuenta en el otro.
+El registro de cuentas continúa disponible en `POST /api/auth/registrar`.
+La gestión de usuarios permite actualizar nombre, correo, rol y contraseña; las
+contraseñas nunca se devuelven en las respuestas. La eliminación es permanente
+y no permite que un administrador borre su propia cuenta desde esta API. Los
+registros nuevos tienen rol `encuestador`; el proyecto no crea un administrador
+inicial por API, por lo que la primera cuenta administradora debe configurarse
+directamente en MongoDB.
 
 ## Variables de entorno
 

@@ -238,3 +238,30 @@ python -m coverage report --fail-under=85
 Jest aplica umbrales mínimos globales de 65% de sentencias, 45% de ramas,
 70% de funciones y 68% de líneas. Los resultados detallados se generan
 localmente y no se suben al repositorio.
+
+## Desplegar en Render
+
+El repositorio incluye `render.yaml` para crear dos servicios web:
+
+- `tpi-node`: aplicación Express y frontend.
+- `tpi-django`: API de reportes y panel administrativo.
+
+Requisitos previos:
+
+1. Crear una base MongoDB en MongoDB Atlas.
+2. Permitir conexiones desde Render y guardar la URI de Atlas.
+3. Subir el proyecto a GitHub.
+4. En Render, elegir **New > Blueprint** y conectar el repositorio.
+
+Durante la configuración, completar manualmente:
+
+- `MONGO_URI` en `tpi-node` con la URI de MongoDB Atlas.
+- `DJANGO_ALLOWED_HOSTS` en `tpi-django` con el hostname público de Django,
+  por ejemplo `tpi-django.onrender.com`.
+- `DJANGO_CORS_ALLOWED_ORIGINS` en `tpi-django` con la URL pública completa de
+  Node, por ejemplo `https://tpi-node.onrender.com`.
+- `DJANGO_REPORTS_URL` en `tpi-node` con la URL interna pública de Django,
+  por ejemplo `https://tpi-django.onrender.com/api/internal/reportes/resumen/`.
+
+Render genera automáticamente las claves `JWT_SECRET`, `DJANGO_SECRET_KEY` y
+`INTERNAL_API_TOKEN`. El último se comparte entre Node y Django.
