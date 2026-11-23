@@ -2,6 +2,18 @@ const Usuario = require('../models/Usuario');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+    },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000
+});
 
 const obtenerJwtSecret = (res) => {
     if (process.env.JWT_SECRET) return process.env.JWT_SECRET;
@@ -83,7 +95,7 @@ const solicitarCodigoRecuperacion = async (req, res) => {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             return res.status(400).json({ mensaje: 'Ingresa un correo electrónico válido.' });
         }
-        if (!process.env.BREVO_API_KEY || !process.env.EMAIL_FROM) {
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
             return res.status(503).json({
                 mensaje: 'El envío de códigos no está configurado. Contacta al administrador.'
             });
@@ -100,25 +112,12 @@ const solicitarCodigoRecuperacion = async (req, res) => {
         await usuario.save();
 
         try {
-            const respuesta = await fetch('https://api.brevo.com/v3/smtp/email', {
-                method: 'POST',
-                signal: AbortSignal.timeout(15000),
-                headers: {
-                    accept: 'application/json',
-                    'api-key': process.env.BREVO_API_KEY,
-                    'content-type': 'application/json'
-                },
-                body: JSON.stringify({
-                    sender: { name: 'Monitoreo Territorial de Goya', email: process.env.EMAIL_FROM },
-                    to: [{ email }],
-                    subject: 'Código para recuperar tu contraseña',
-                    textContent: `Tu código temporal es: ${codigoToken}. Este código expira en 10 minutos.`
-                })
+            await transporter.sendMail({
+                from: `"Monitoreo Goya - El Niño" <${process.env.EMAIL_USER}>`,
+                to: email,
+                subject: 'Código para recuperar tu contraseña',
+                text: `Tu código temporal es: ${codigoToken}. Este código expira en 10 minutos.`
             });
-            if (!respuesta.ok) {
-                console.error(`Brevo rechazó el envío del código (HTTP ${respuesta.status}).`);
-                throw new Error('Brevo rechazó el envío del correo.');
-            }
         } catch (error) {
             usuario.tokenAcceso = undefined;
             usuario.tokenExpiracion = undefined;
@@ -128,12 +127,14 @@ const solicitarCodigoRecuperacion = async (req, res) => {
                 console.error(`No se pudo limpiar el código de recuperación: ${errorLimpieza.message}`);
             }
 
-            const tiempoAgotado = error.name === 'TimeoutError' || error.name === 'AbortError';
+            const tiempoAgotado = error.name === 'TimeoutError' ||
+                error.name === 'AbortError' ||
+                error.code === 'ETIMEDOUT';
             console.error(`No se pudo enviar el código de recuperación: ${error.message}`);
             return res.status(tiempoAgotado ? 504 : 502).json({
                 mensaje: tiempoAgotado
-                    ? 'El envío del correo tardó demasiado. Intenta nuevamente.'
-                    : 'No se pudo enviar el correo. Verifica la configuración del remitente en Brevo.'
+                    ? 'El hosting no pudo conectarse con Gmail por SMTP. Comprueba que permita conexiones SMTP y vuelve a intentar.'
+                    : 'No se pudo enviar el correo. Verifica EMAIL_USER y EMAIL_PASS.'
             });
         }
 

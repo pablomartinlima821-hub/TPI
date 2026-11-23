@@ -187,7 +187,7 @@
                     <input type="email" id="rec-email" placeholder="tu_correo@gmail.com" class="w-full px-4 py-2 border dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none">
                 </div>
                 <button id="recovery-send-token" onclick="solicitarTokenRecuperacion()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 rounded-lg transition-colors shadow-md">
-                    Enviar código por correo
+                    Enviar Token por Gmail
                 </button>
 
                 <div id="recovery-token-section" class="hidden space-y-3 pt-4 border-t dark:border-slate-700">
@@ -1011,7 +1011,7 @@
                 msg.innerText = "No se pudo conectar con el servidor. Intenta nuevamente.";
             } finally {
                 boton.disabled = false;
-                boton.textContent = 'Enviar código por correo';
+                boton.textContent = 'Enviar Token por Gmail';
             }
         }
 

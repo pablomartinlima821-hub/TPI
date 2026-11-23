@@ -13,9 +13,9 @@ services:
         generateValue: true
       - key: DJANGO_REPORTS_URL
         sync: false
-      - key: BREVO_API_KEY
+      - key: EMAIL_USER
         sync: false
-      - key: EMAIL_FROM
+      - key: EMAIL_PASS
         sync: false
       - fromGroup: tpi-django-shared
 
