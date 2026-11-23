@@ -119,10 +119,28 @@ async function consultarYGuardarMedicion() {
     sincronizacionEnCurso = (async () => {
         estadoSincronizacion.ultimaConsulta = new Date();
         try {
-            const respuesta = await fetch(FUENTE_URL, {
-                signal: AbortSignal.timeout(15000),
-                headers: { Accept: 'text/html' }
-            });
+            let respuesta;
+            let ultimoError;
+            for (let intento = 1; intento <= 2; intento++) {
+                try {
+                    respuesta = await fetch(FUENTE_URL, {
+                        signal: AbortSignal.timeout(15000),
+                        headers: {
+                            Accept: 'text/html',
+                            'User-Agent': 'Mozilla/5.0 (compatible; TPI-Monitoreo/1.0)'
+                        }
+                    });
+                    break;
+                } catch (error) {
+                    ultimoError = error;
+                    if (intento === 1) {
+                        await new Promise((resolve) => setTimeout(resolve, 1000));
+                    }
+                }
+            }
+            if (!respuesta) {
+                throw ultimoError || new Error('No se pudo consultar Prefectura.');
+            }
             if (!respuesta.ok) {
                 throw new Error(`Prefectura respondió con estado HTTP ${respuesta.status}.`);
             }

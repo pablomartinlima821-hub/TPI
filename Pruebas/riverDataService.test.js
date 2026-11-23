@@ -71,7 +71,10 @@ describe('Datos de altura de Prefectura Naval Argentina', () => {
             const resultado = await consultarYGuardarMedicion();
 
             expect(global.fetch).toHaveBeenCalledWith(FUENTE_URL, expect.objectContaining({
-                headers: { Accept: 'text/html' }
+                headers: {
+                    Accept: 'text/html',
+                    'User-Agent': 'Mozilla/5.0 (compatible; TPI-Monitoreo/1.0)'
+                }
             }));
             expect(guardarMedicion).toHaveBeenCalledWith(
                 { estacion: 'GOYA', fechaMedicion: new Date('2026-11-10T16:00:00.000Z') },
