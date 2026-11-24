@@ -483,6 +483,9 @@
         let riverStatusRequest = null;
         let reportsRefreshTimer = null;
         let reportsRefreshInProgress = false;
+        let reportsSummaryRefreshInProgress = false;
+        let reportsSummaryRefreshQuery = null;
+        let pendingReportsSummaryQuery = null;
         let barrios = [];
         let barriosMarkerLayer = null;
         let editingBarrioClave = null;
@@ -550,7 +553,13 @@
                 const nombre = document.createElement('span');
                 nombre.className = 'font-semibold text-slate-800 dark:text-white text-sm';
                 nombre.textContent = barrio.nombre;
-                encabezado.appendChild(nombre);
+                const enlaceMapa = document.createElement('button');
+                enlaceMapa.type = 'button';
+                enlaceMapa.className = 'text-left hover:text-blue-600 dark:hover:text-blue-400';
+                enlaceMapa.setAttribute('aria-label', `Mostrar ${barrio.nombre} en el mapa`);
+                enlaceMapa.appendChild(nombre);
+                enlaceMapa.addEventListener('click', () => enfocarBarrio(barrio));
+                encabezado.appendChild(enlaceMapa);
 
                 const situacion = ['critico', 'estable', 'sin_datos'].includes(barrio.situacion)
                     ? barrio.situacion
@@ -596,12 +605,13 @@
                     if (barriosMarkerLayer) {
                         const popup = document.createElement('strong');
                         popup.textContent = `${barrio.nombre} · ${critico ? 'Crítico' : estable ? 'Estable' : 'Sin datos'}`;
-                        L.circleMarker([lat, lng], {
+                        const marcador = L.circleMarker([lat, lng], {
                             radius: 9,
                             color: critico ? '#991b1b' : estable ? '#166534' : '#475569',
                             fillColor: critico ? '#ef4444' : estable ? '#22c55e' : '#94a3b8',
                             fillOpacity: 0.85
                         }).bindPopup(popup).addTo(barriosMarkerLayer);
+                        marcador.barrioClave = barrio.clave;
                     }
                 } else {
                     const sinCoordenadas = document.createElement('p');
@@ -632,6 +642,28 @@
                 }
                 lista.appendChild(tarjeta);
             });
+        }
+
+        function enfocarBarrio(barrio) {
+            const lat = Number(barrio.coordenadas?.lat);
+            const lng = Number(barrio.coordenadas?.lng);
+            const coordenadasValidas = Number.isFinite(lat) && Number.isFinite(lng) &&
+                lat >= -29.5 && lat <= -29 && lng >= -59.5 && lng <= -59;
+            const mensaje = document.getElementById('neighborhood-message');
+
+            if (!coordenadasValidas) {
+                mensaje.className = 'text-xs mt-2 text-amber-600 dark:text-amber-300';
+                mensaje.textContent = `${barrio.nombre} todavía no tiene coordenadas configuradas.`;
+                return;
+            }
+            if (!mapInstance) return;
+
+            mensaje.textContent = '';
+            mapInstance.getContainer().scrollIntoView({ behavior: 'smooth', block: 'center' });
+            mapInstance.setView([lat, lng], 16);
+            const marcador = barriosMarkerLayer?.getLayers()
+                .find((layer) => layer.barrioClave === barrio.clave);
+            if (marcador) marcador.openPopup();
         }
 
         async function actualizarBarrios() {
@@ -1288,14 +1320,36 @@
         async function actualizarPanelRelevamientos() {
             if (reportsRefreshInProgress) return;
             reportsRefreshInProgress = true;
+            let query;
             try {
-                const query = reportsFiltersQuery();
-                const [relevamientos, resumen, barriosActuales] = await Promise.all([
+                query = reportsFiltersQuery();
+                const [relevamientos, barriosActuales] = await Promise.all([
                     reportsApi(query),
-                    reportsApi(`/resumen${query}`),
                     barriosApi('/')
                 ]);
                 mostrarRelevamientos(relevamientos, indexarSituacionesBarrios(barriosActuales));
+                mostrarMensajeRelevamientos('Tabla actualizada; actualizando resumen de Django.');
+            } catch (error) {
+                mostrarMensajeRelevamientos(error.message, true);
+                return;
+            } finally {
+                reportsRefreshInProgress = false;
+            }
+
+            void actualizarResumenRelevamientos(query);
+        }
+
+        async function actualizarResumenRelevamientos(query) {
+            if (reportsSummaryRefreshInProgress) {
+                pendingReportsSummaryQuery = query === reportsSummaryRefreshQuery ? null : query;
+                return;
+            }
+
+            reportsSummaryRefreshInProgress = true;
+            reportsSummaryRefreshQuery = query;
+            try {
+                const resumen = await reportsApi(`/resumen${query}`);
+                if (query !== reportsFiltersQuery()) return;
                 document.getElementById('reports-total').textContent = resumen.total;
                 document.getElementById('reports-critical').textContent = resumen.criticos;
                 document.getElementById('reports-people').textContent = resumen.personasAfectadas;
@@ -1304,9 +1358,20 @@
                     : 'Todavía no hay reportes.';
                 mostrarMensajeRelevamientos('Datos actualizados.');
             } catch (error) {
-                mostrarMensajeRelevamientos(error.message, true);
+                if (query === reportsFiltersQuery()) {
+                    mostrarMensajeRelevamientos(
+                        `La tabla se actualizó, pero el resumen de Django no está disponible: ${error.message}`,
+                        true
+                    );
+                }
             } finally {
-                reportsRefreshInProgress = false;
+                reportsSummaryRefreshInProgress = false;
+                reportsSummaryRefreshQuery = null;
+                const siguienteQuery = pendingReportsSummaryQuery;
+                pendingReportsSummaryQuery = null;
+                if (siguienteQuery !== null && siguienteQuery !== query) {
+                    void actualizarResumenRelevamientos(siguienteQuery);
+                }
             }
         }
 

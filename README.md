@@ -258,17 +258,20 @@ Requisitos previos:
 Durante la configuración, completar manualmente:
 
 - `MONGO_URI` en `tpi-node` con la URI de MongoDB Atlas.
-- `DJANGO_ALLOWED_HOSTS` en `tpi-django` con el hostname público de Django,
-  por ejemplo `tpi-django.onrender.com`.
-- `DJANGO_CORS_ALLOWED_ORIGINS` en `tpi-django` con la URL pública completa de
-  Node, por ejemplo `https://tpi-node.onrender.com`.
-- `DJANGO_REPORTS_URL` en `tpi-node` con la URL interna pública de Django,
-  por ejemplo `https://tpi-django.onrender.com/api/internal/reportes/resumen/`.
 - `EMAIL_USER` en `tpi-node` con la cuenta Gmail remitente.
 - `EMAIL_PASS` en `tpi-node` con su contraseña de aplicación.
 
 Render genera automáticamente las claves `JWT_SECRET`, `DJANGO_SECRET_KEY` y
-`INTERNAL_API_TOKEN`. El último se comparte entre Node y Django.
+`INTERNAL_API_TOKEN`. El último se comparte entre Node y Django. El Blueprint
+configura el hostname Django desde `RENDER_EXTERNAL_HOSTNAME` y enlaza Node con
+`https://tpi-django.onrender.com/api/internal/reportes/resumen/`.
+
+Los dos servicios se despliegan automáticamente en cada commit de la rama
+conectada al Blueprint. En el plan Free, Render suspende cada servicio tras
+15 minutos sin tráfico y el siguiente arranque puede tardar alrededor de un
+minuto. La tabla de reportes se carga desde Node/MongoDB sin esperar a Django;
+el resumen se actualiza cuando Django vuelve a responder. Para evitar esas
+suspensiones se necesita un plan de servicio pago.
 
 El plan Free de Render bloquea el tráfico SMTP saliente. Para enviar correos
 desde el servicio Node alojado allí, se necesita un plan de Render que permita

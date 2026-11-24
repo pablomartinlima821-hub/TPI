@@ -15,6 +15,11 @@ class RelevamientoApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['backend'], 'django')
 
+    def test_root_endpoint_reports_service_health(self):
+        response = self.client.get('/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['backend'], 'django')
+
     def test_relevamientos_require_authentication(self):
         response = self.client.get('/api/relevamientos/')
         self.assertEqual(response.status_code, 403)

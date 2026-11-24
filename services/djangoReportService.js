@@ -1,5 +1,6 @@
 const REPORTS_URL = () => process.env.DJANGO_REPORTS_URL
     || 'http://127.0.0.1:8000/api/internal/reportes/resumen/';
+const TIMEOUT_MS = 75000;
 
 const generarResumenTerritorial = async (datos) => {
     const token = process.env.INTERNAL_API_TOKEN;
@@ -18,7 +19,7 @@ const generarResumenTerritorial = async (datos) => {
                 'X-Internal-Token': token
             },
             body: JSON.stringify(datos),
-            signal: AbortSignal.timeout(5000)
+            signal: AbortSignal.timeout(TIMEOUT_MS)
         });
     } catch (cause) {
         const error = new Error('El servicio de reportes Django no está disponible.', { cause });
