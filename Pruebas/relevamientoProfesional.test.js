@@ -9,6 +9,10 @@ jest.mock('../models/MedicionRio', () => ({
     findOne: jest.fn()
 }));
 
+jest.mock('../models/Barrio', () => ({
+    find: jest.fn()
+}));
+
 jest.mock('../relevamiento_territorial/models/Relevamiento', () => {
     const Relevamiento = jest.fn(function (datos) {
         Object.assign(this, datos);
@@ -26,6 +30,7 @@ jest.mock('../services/djangoReportService', () => ({
 
 const Usuario = require('../relevamiento_territorial/models/Usuario');
 const MedicionRio = require('../models/MedicionRio');
+const Barrio = require('../models/Barrio');
 const Relevamiento = require('../relevamiento_territorial/models/Relevamiento');
 const { generarResumenTerritorial } = require('../services/djangoReportService');
 const app = require('../app');
@@ -47,6 +52,10 @@ describe('Mejoras profesionales de relevamientos', () => {
         generarResumenTerritorial.mockReset();
         Usuario.findById.mockReturnValue({
             select: jest.fn().mockResolvedValue({ nombre: 'Encuestador', email: 'campo@example.com' })
+        });
+        Barrio.find.mockReturnValue({
+            select: jest.fn().mockReturnThis(),
+            lean: jest.fn().mockResolvedValue([])
         });
         Relevamiento.prototype.save.mockResolvedValue();
     });
@@ -178,23 +187,36 @@ describe('Mejoras profesionales de relevamientos', () => {
         }
     });
 
-    it('envía métricas agregadas de MongoDB a Django y conserva el resumen para el panel', async () => {
+    it('envía a Django los totales actuales por barrio sin cambiar las métricas de los reportes', async () => {
         const ultimo = {
             barrio: 'Centro',
             fechaRegistro: new Date('2026-11-19T12:00:00.000Z')
         };
         Relevamiento.aggregate.mockResolvedValue([
-            { _id: 'Centro', total: 2, criticos: 1, personasAfectadas: 4 }
+            { _id: 'Centro', total: 2, criticos: 1 },
+            { _id: 'Centro Histórico', total: 1, criticos: 0 }
         ]);
+        Barrio.find.mockReturnValue({
+            select: jest.fn().mockReturnThis(),
+            lean: jest.fn().mockResolvedValue([
+                {
+                    clave: 'centro',
+                    nombre: 'Centro',
+                    origenNombre: 'Centro Histórico',
+                    personasAfectadas: 12
+                },
+                { clave: 'puerto', nombre: 'Puerto', personasAfectadas: 4 }
+            ])
+        });
         Relevamiento.findOne.mockReturnValue({
             sort: jest.fn().mockReturnThis(),
             select: jest.fn().mockReturnThis(),
             lean: jest.fn().mockResolvedValue(ultimo)
         });
         const resumen = {
-            total: 2,
+            total: 3,
             criticos: 1,
-            personasAfectadas: 4,
+            personasAfectadas: 16,
             ultimo,
             porcentajeCriticos: 50,
             barriosPrioritarios: [],
@@ -203,14 +225,58 @@ describe('Mejoras profesionales de relevamientos', () => {
         generarResumenTerritorial.mockResolvedValue(resumen);
         const res = respuesta();
 
-        await obtenerResumen({ query: { barrio: 'Centro' } }, res);
+        await obtenerResumen({ query: {} }, res);
 
+        expect(Barrio.find).toHaveBeenCalledWith({ eliminado: { $ne: true } });
         expect(generarResumenTerritorial).toHaveBeenCalledWith({
-            barrios: [{ barrio: 'Centro', total: 2, criticos: 1, personasAfectadas: 4 }],
+            barrios: [
+                { barrio: 'Centro', total: 3, criticos: 1, personasAfectadas: 12 },
+                { barrio: 'Puerto', total: 0, criticos: 0, personasAfectadas: 4 }
+            ],
             ultimo
         });
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(resumen);
+    });
+
+    it('incluye el total actual al filtrar por el nombre original del barrio', async () => {
+        Relevamiento.aggregate.mockResolvedValue([
+            { _id: 'Centro Histórico', total: 1, criticos: 0 }
+        ]);
+        Barrio.find.mockReturnValue({
+            select: jest.fn().mockReturnThis(),
+            lean: jest.fn().mockResolvedValue([
+                {
+                    clave: 'centro',
+                    nombre: 'Centro',
+                    origenNombre: 'Centro Histórico',
+                    personasAfectadas: 12
+                },
+                { clave: 'puerto', nombre: 'Puerto', personasAfectadas: 4 }
+            ])
+        });
+        Relevamiento.findOne.mockReturnValue({
+            sort: jest.fn().mockReturnThis(),
+            select: jest.fn().mockReturnThis(),
+            lean: jest.fn().mockResolvedValue(null)
+        });
+        generarResumenTerritorial.mockResolvedValue({
+            total: 1,
+            criticos: 0,
+            personasAfectadas: 12,
+            ultimo: null,
+            porcentajeCriticos: 0,
+            barriosPrioritarios: [],
+            procesadoPor: 'django'
+        });
+        const res = respuesta();
+
+        await obtenerResumen({ query: { barrio: 'historico' } }, res);
+
+        expect(generarResumenTerritorial).toHaveBeenCalledWith({
+            barrios: [{ barrio: 'Centro', total: 1, criticos: 0, personasAfectadas: 12 }],
+            ultimo: null
+        });
     });
 
     it('devuelve 503 explícito si el servicio de reportes Django no está disponible', async () => {

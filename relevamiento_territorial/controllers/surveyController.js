@@ -7,9 +7,78 @@ const {
     UMBRAL_EVACUACION_METROS
 } = require('../Servicios/relevamientoServicio');
 const { generarResumenTerritorial } = require('../../services/djangoReportService');
+const Barrio = require('../../models/Barrio');
 
 const ESTACION_RIO = 'GOYA';
 const ESTADOS_SEGUIMIENTO = ['pendiente', 'en-seguimiento', 'resuelto'];
+
+const normalizarNombreBarrio = (nombre) => String(nombre || '')
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es-AR');
+
+const personasAfectadasDelBarrio = (barrio) => {
+    const cantidad = barrio.personasAfectadas ?? 0;
+    if (!Number.isSafeInteger(cantidad) || cantidad < 0) {
+        throw new Error(`La cantidad de personas afectadas del barrio "${barrio.nombre}" no es válida.`);
+    }
+    return cantidad;
+};
+
+const prepararMetricasParaDjango = (metricasReportadas, barriosActuales, filtroBarrio) => {
+    const termino = normalizarNombreBarrio(filtroBarrio);
+    const barriosFiltrados = barriosActuales.filter((barrio) => {
+        if (!termino) return true;
+        return [barrio.nombre, barrio.origenNombre]
+            .some((nombre) => normalizarNombreBarrio(nombre).includes(termino));
+    });
+    const barrioPorNombre = new Map();
+    barriosFiltrados.forEach((barrio) => {
+        [barrio.nombre, barrio.origenNombre]
+            .map(normalizarNombreBarrio)
+            .filter(Boolean)
+            .forEach((nombre) => barrioPorNombre.set(nombre, barrio));
+    });
+
+    const resumenPorBarrio = new Map();
+    metricasReportadas.forEach((metricas) => {
+        const nombreOriginal = String(metricas._id || '').trim();
+        const nombreNormalizado = normalizarNombreBarrio(nombreOriginal);
+        const barrioActual = barrioPorNombre.get(nombreNormalizado);
+        if (termino && !nombreNormalizado.includes(termino) && !barrioActual) return;
+
+        const clave = barrioActual
+            ? `barrio:${barrioActual.clave}`
+            : `relevamiento:${nombreNormalizado}`;
+        let resumen = resumenPorBarrio.get(clave);
+        if (!resumen) {
+            resumen = {
+                barrio: barrioActual?.nombre || nombreOriginal,
+                total: 0,
+                criticos: 0,
+                personasAfectadas: barrioActual ? personasAfectadasDelBarrio(barrioActual) : 0
+            };
+            resumenPorBarrio.set(clave, resumen);
+        }
+        resumen.total += metricas.total;
+        resumen.criticos += metricas.criticos;
+    });
+
+    barriosFiltrados.forEach((barrio) => {
+        const clave = `barrio:${barrio.clave}`;
+        if (!resumenPorBarrio.has(clave)) {
+            resumenPorBarrio.set(clave, {
+                barrio: barrio.nombre,
+                total: 0,
+                criticos: 0,
+                personasAfectadas: personasAfectadasDelBarrio(barrio)
+            });
+        }
+    });
+
+    return [...resumenPorBarrio.values()];
+};
 
 const crearFiltro = (query) => {
     const filtro = {};
@@ -114,7 +183,7 @@ const obtenerResumen = async (req, res) => {
         const resultadoFiltro = crearFiltro(req.query);
         if (resultadoFiltro.error) return res.status(400).json({ mensaje: resultadoFiltro.error });
 
-        const [barrios, ultimo] = await Promise.all([
+        const [metricasReportadas, ultimo, barriosActuales] = await Promise.all([
             Relevamiento.aggregate([
             { $match: resultadoFiltro.filtro },
             {
@@ -129,19 +198,25 @@ const obtenerResumen = async (req, res) => {
                                 0
                             ]
                         }
-                    },
-                    personasAfectadas: { $sum: { $ifNull: ['$personasAfectadas', 0] } }
+                    }
                 }
             }
             ]),
             Relevamiento.findOne(resultadoFiltro.filtro)
                 .sort({ fechaRegistro: -1 })
                 .select('fechaRegistro barrio')
+                .lean(),
+            Barrio.find({ eliminado: { $ne: true } })
+                .select('clave nombre origenNombre personasAfectadas')
                 .lean()
         ]);
 
         const resumen = await generarResumenTerritorial({
-            barrios: barrios.map(({ _id, ...metricas }) => ({ barrio: _id, ...metricas })),
+            barrios: prepararMetricasParaDjango(
+                metricasReportadas,
+                barriosActuales,
+                req.query.barrio
+            ),
             ultimo
         });
         return res.status(200).json(resumen);

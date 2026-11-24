@@ -25,10 +25,13 @@ Navegador
                            └─ Express devuelve el resumen al navegador
 ```
 
-El frontend sigue hablando únicamente con Node. Node aplica los filtros y
-envía a Django cantidades agregadas por barrio y el identificador de barrio y
-fecha del último reporte. No envía nombres, correos, coordenadas ni
-observaciones. Django devuelve:
+El frontend sigue hablando únicamente con Node. Node aplica los filtros a los
+relevamientos y combina sus cantidades totales y críticas con la cantidad
+actual de personas afectadas guardada en cada barrio. Envía esas métricas por
+barrio y el identificador de barrio y fecha del último reporte. El total de
+personas del resumen usa los valores actuales de los barrios; las filas y
+cantidades originales de los relevamientos no se modifican. No envía correos,
+coordenadas ni observaciones. Django devuelve:
 
 - total de relevamientos;
 - cantidad y porcentaje de críticos según el umbral del proyecto (7 m);

@@ -322,7 +322,7 @@
                                     <p id="reports-critical" class="text-2xl font-bold text-red-600">0</p>
                                 </article>
                                 <article class="bg-slate-50 dark:bg-slate-700 p-4 rounded-xl border dark:border-slate-600">
-                                    <p class="text-sm text-slate-500 dark:text-slate-300">Personas afectadas reportadas</p>
+                                    <p class="text-sm text-slate-500 dark:text-slate-300">Personas afectadas actuales por barrio</p>
                                     <p id="reports-people" class="text-2xl font-bold text-slate-800 dark:text-white">0</p>
                                 </article>
                             </div>
@@ -430,7 +430,7 @@
                     <div class="report-summary-grid">
                         <div class="report-summary-card">Reportes registrados<strong id="report-total">0</strong></div>
                         <div class="report-summary-card">Umbral de evacuación (7 m)<strong id="report-critical">0</strong></div>
-                        <div class="report-summary-card">Personas afectadas reportadas<strong id="report-people">0</strong></div>
+                        <div class="report-summary-card">Personas afectadas actuales por barrio<strong id="report-people">0</strong></div>
                     </div>
                     <p id="report-summary-text"></p>
                 </section>
@@ -1407,7 +1407,7 @@
             document.getElementById('report-summary-text').textContent =
                 `En la selección se registraron ${total.toLocaleString('es-AR')} relevamientos; ` +
                 `${criticos.toLocaleString('es-AR')} alcanzan el umbral de evacuación y se reportaron ` +
-                `${personasAfectadas.toLocaleString('es-AR')} personas afectadas. ` +
+                `un total actual de ${personasAfectadas.toLocaleString('es-AR')} personas afectadas en los barrios. ` +
                 `El ${porcentajeCriticos.toLocaleString('es-AR')}% es crítico; resumen calculado por Django ` +
                 `con datos de Node.js.` +
                 (barrioPrioritario
