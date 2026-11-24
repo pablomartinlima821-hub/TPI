@@ -44,6 +44,10 @@ integrados funcionen.
 5. Como recorrido separado, abrir http://127.0.0.1:8000/admin/ e iniciar sesión
    con el superusuario Django.
 
+Los administradores pueden editar cada barrio para registrar su cantidad actual
+de personas afectadas. Ese valor se muestra en la tarjeta del barrio y no
+reemplaza las cantidades registradas en los relevamientos individuales.
+
 El umbral de 7 m es una regla del proyecto para clasificar registros; no es una
 alerta oficial ni una instrucción de evacuación.
 

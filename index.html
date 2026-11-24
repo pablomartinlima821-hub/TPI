@@ -256,7 +256,7 @@
                         <div id="neighborhood-list" class="space-y-3 overflow-y-auto max-h-[340px] pr-1" aria-live="polite"></div>
                         <p id="neighborhood-message" role="status" class="text-xs mt-2"></p>
                     </div>
-                    <form id="neighborhood-edit-form" class="hidden mt-3 pt-3 border-t dark:border-slate-600 space-y-2">
+                    <form id="neighborhood-edit-form" class="hidden mt-3 pt-3 border-t dark:border-slate-600 space-y-2 max-h-[290px] overflow-y-auto pr-1">
                         <p class="text-sm font-semibold text-slate-800 dark:text-white">Editar barrio</p>
                         <label class="block text-xs text-slate-600 dark:text-slate-300">Nombre
                             <input name="nombre" required maxlength="120" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
@@ -270,6 +270,9 @@
                                 <option value="critico">Crítico</option>
                                 <option value="sin_datos">Sin datos</option>
                             </select>
+                        </label>
+                        <label class="block text-xs text-slate-600 dark:text-slate-300">Personas afectadas registradas
+                            <input name="personasAfectadas" type="number" min="0" step="1" required class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm">
                         </label>
                         <label class="block text-xs text-slate-600 dark:text-slate-300">Motivo del cambio de situación
                             <input name="motivoSituacion" maxlength="300" class="mt-1 w-full border bg-white dark:bg-slate-800 rounded-lg p-2 text-sm" placeholder="Opcional">
@@ -580,6 +583,12 @@
                 ubicacion.textContent = `Ubicación: ${barrio.ubicacion}`;
                 tarjeta.append(encabezado, ubicacion);
 
+                const personasAfectadas = document.createElement('p');
+                personasAfectadas.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
+                personasAfectadas.textContent =
+                    `Personas afectadas registradas: ${Number(barrio.personasAfectadas || 0).toLocaleString('es-AR')}`;
+                tarjeta.appendChild(personasAfectadas);
+
                 const historial = Array.isArray(barrio.historialSituacion) ? barrio.historialSituacion : [];
                 const ultimoCambio = historial[historial.length - 1];
                 if (ultimoCambio) {
@@ -695,6 +704,7 @@
             formulario.querySelector('[name="nombre"]').value = barrio.nombre;
             formulario.querySelector('[name="ubicacion"]').value = barrio.ubicacion;
             formulario.querySelector('[name="situacion"]').value = barrio.situacion || 'sin_datos';
+            formulario.querySelector('[name="personasAfectadas"]').value = barrio.personasAfectadas ?? 0;
             formulario.querySelector('[name="motivoSituacion"]').value = '';
             formulario.querySelector('[name="lat"]').value = barrio.coordenadas?.lat ?? '';
             formulario.querySelector('[name="lng"]').value = barrio.coordenadas?.lng ?? '';
@@ -769,6 +779,7 @@
                             nombre: campos.get('nombre'),
                             ubicacion: campos.get('ubicacion'),
                             situacion: campos.get('situacion'),
+                            personasAfectadas: Number(campos.get('personasAfectadas')),
                             motivoSituacion: campos.get('motivoSituacion'),
                             ...(lat || lng ? {
                                 coordenadas: {

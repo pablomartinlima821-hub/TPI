@@ -153,6 +153,13 @@ const actualizarBarrio = async (req, res) => {
     const lat = typeof latTexto === 'number' || typeof latTexto === 'string' ? Number(latTexto) : NaN;
     const lng = typeof lngTexto === 'number' || typeof lngTexto === 'string' ? Number(lngTexto) : NaN;
     const situacion = req.body?.situacion;
+    const personasAfectadasIncluidas = req.body?.personasAfectadas !== undefined;
+    const personasAfectadasTexto = req.body?.personasAfectadas;
+    const personasAfectadas = typeof personasAfectadasTexto === 'number'
+        ? personasAfectadasTexto
+        : typeof personasAfectadasTexto === 'string' && personasAfectadasTexto.trim()
+            ? Number(personasAfectadasTexto)
+            : NaN;
     const motivoSituacion = typeof req.body?.motivoSituacion === 'string'
         ? req.body.motivoSituacion.trim()
         : '';
@@ -169,6 +176,12 @@ const actualizarBarrio = async (req, res) => {
             mensaje: 'Ingresa un nombre, una ubicación, coordenadas válidas dentro del área de Goya (si las modificas, completa latitud y longitud) y una situación válida.'
         });
     }
+    if (personasAfectadasIncluidas &&
+        (!Number.isSafeInteger(personasAfectadas) || personasAfectadas < 0)) {
+        return res.status(400).json({
+            mensaje: 'La cantidad de personas afectadas debe ser un entero no negativo.'
+        });
+    }
 
     try {
         const filtro = { clave: req.params.clave, eliminado: { $ne: true } };
@@ -182,7 +195,8 @@ const actualizarBarrio = async (req, res) => {
                 nombre,
                 ubicacion,
                 ...(coordenadasIncluidas ? { coordenadas: { lat, lng } } : {}),
-                ...(situacion ? { situacion } : {})
+                ...(situacion ? { situacion } : {}),
+                ...(personasAfectadasIncluidas ? { personasAfectadas } : {})
             }
         };
         if (situacion && situacion !== (barrioExistente.situacion || 'sin_datos')) {

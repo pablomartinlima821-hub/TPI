@@ -134,6 +134,55 @@ describe('Gestión de barrios', () => {
         expect(respuesta.status).toHaveBeenCalledWith(200);
     });
 
+    it('guarda la cantidad de personas afectadas del barrio', async () => {
+        const barrioActualizado = {
+            clave: 'puerto-costanera',
+            personasAfectadas: 12
+        };
+        Barrio.findOneAndUpdate.mockReturnValue({
+            lean: () => Promise.resolve(barrioActualizado)
+        });
+        const respuesta = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        await actualizarBarrio({
+            params: { clave: 'puerto-costanera' },
+            body: {
+                nombre: 'Zona Puerto / Costanera',
+                ubicacion: 'Puerto y Costanera de Goya',
+                personasAfectadas: '12'
+            }
+        }, respuesta);
+
+        expect(Barrio.findOneAndUpdate).toHaveBeenCalledWith(
+            { clave: 'puerto-costanera', eliminado: { $ne: true } },
+            { $set: expect.objectContaining({ personasAfectadas: 12 }) },
+            { new: true, runValidators: true }
+        );
+        expect(respuesta.status).toHaveBeenCalledWith(200);
+    });
+
+    it.each([-1, 1.5])('rechaza una cantidad inválida de personas afectadas: %s', async (cantidad) => {
+        const respuesta = {
+            status: jest.fn().mockReturnThis(),
+            json: jest.fn()
+        };
+
+        await actualizarBarrio({
+            params: { clave: 'puerto-costanera' },
+            body: {
+                nombre: 'Zona Puerto / Costanera',
+                ubicacion: 'Puerto y Costanera de Goya',
+                personasAfectadas: cantidad
+            }
+        }, respuesta);
+
+        expect(respuesta.status).toHaveBeenCalledWith(400);
+        expect(Barrio.findOneAndUpdate).not.toHaveBeenCalled();
+    });
+
     it('rechaza una situación de barrio distinta de crítica o estable', async () => {
         const respuesta = {
             status: jest.fn().mockReturnThis(),

@@ -22,6 +22,15 @@ const barrioSchema = new mongoose.Schema({
     ubicacion: { type: String, required: true, trim: true, maxlength: 300 },
     origenNombre: { type: String, trim: true, maxlength: 120 },
     coordenadas: { type: coordenadasSchema, default: null },
+    personasAfectadas: {
+        type: Number,
+        min: 0,
+        default: 0,
+        validate: {
+            validator: Number.isSafeInteger,
+            message: 'La cantidad de personas afectadas debe ser un entero no negativo.'
+        }
+    },
     situacion: { type: String, enum: ['critico', 'estable', 'sin_datos'], default: 'sin_datos' },
     historialSituacion: { type: [cambioSituacionSchema], default: [] },
     orden: { type: Number, required: true },
