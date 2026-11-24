@@ -1,4 +1,8 @@
+import os
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
+from django.core.management import call_command, CommandError
 from django.test import override_settings
 from rest_framework.test import APITestCase
 
@@ -19,6 +23,30 @@ class RelevamientoApiTests(APITestCase):
         response = self.client.get('/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['backend'], 'django')
+
+    def test_ensure_admin_creates_the_configured_superuser_idempotently(self):
+        variables = {
+            'DJANGO_ADMIN_USERNAME': 'render-admin',
+            'DJANGO_ADMIN_PASSWORD': 'temporary-test-password',
+        }
+        with patch.dict(os.environ, variables):
+            call_command('ensure_admin')
+            call_command('ensure_admin')
+
+        user = User.objects.get(username='render-admin')
+        self.assertTrue(user.is_superuser)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.check_password('temporary-test-password'))
+        self.assertEqual(User.objects.filter(username='render-admin').count(), 1)
+
+    def test_ensure_admin_rejects_partial_configuration(self):
+        variables = {
+            'DJANGO_ADMIN_USERNAME': 'render-admin',
+            'DJANGO_ADMIN_PASSWORD': '',
+        }
+        with patch.dict(os.environ, variables):
+            with self.assertRaises(CommandError):
+                call_command('ensure_admin')
 
     def test_relevamientos_require_authentication(self):
         response = self.client.get('/api/relevamientos/')

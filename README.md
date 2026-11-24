@@ -266,6 +266,12 @@ Render genera automáticamente las claves `JWT_SECRET`, `DJANGO_SECRET_KEY` y
 configura el hostname Django desde `RENDER_EXTERNAL_HOSTNAME` y enlaza Node con
 `https://tpi-django.onrender.com/api/internal/reportes/resumen/`.
 
+Para acceder al panel `https://tpi-django.onrender.com/admin/`, define
+`DJANGO_ADMIN_USERNAME` y `DJANGO_ADMIN_PASSWORD` en las variables de entorno
+del servicio `tpi-django`. El comando de inicio crea el superusuario si aún no
+existe y no modifica la contraseña de un usuario existente. No guardes esa
+contraseña en el repositorio ni la compartas por el chat.
+
 Los dos servicios se despliegan automáticamente en cada commit de la rama
 conectada al Blueprint. En el plan Free, Render suspende cada servicio tras
 15 minutos sin tráfico y el siguiente arranque puede tardar alrededor de un

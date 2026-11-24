@@ -26,13 +26,17 @@ services:
     plan: free
     autoDeployTrigger: commit
     buildCommand: pip install -r django_backend/requirements.txt && python django_backend/manage.py collectstatic --noinput
-    startCommand: python django_backend/manage.py migrate && gunicorn config.wsgi:application --chdir django_backend --bind 0.0.0.0:$PORT
+    startCommand: python django_backend/manage.py migrate && python django_backend/manage.py ensure_admin && gunicorn config.wsgi:application --chdir django_backend --bind 0.0.0.0:$PORT
     healthCheckPath: /api/health/
     envVars:
       - key: DJANGO_DEBUG
         value: false
       - key: DJANGO_SECRET_KEY
         generateValue: true
+      - key: DJANGO_ADMIN_USERNAME
+        sync: false
+      - key: DJANGO_ADMIN_PASSWORD
+        sync: false
       - fromGroup: tpi-django-shared
 
 envVarGroups:
