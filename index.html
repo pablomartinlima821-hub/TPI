@@ -815,14 +815,16 @@
                     if (!response.ok) throw new Error(data.mensaje || 'No se pudo consultar la medición del río.');
 
                     const medicion = data.medicion;
-                    altura.textContent = `${Number(medicion.alturaMetros).toLocaleString('es-AR', {
+                    const alturaMetros = Number(medicion.alturaMetros);
+                    altura.textContent = `${alturaMetros.toLocaleString('es-AR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     })} m`;
-                    estado.textContent = medicion.estado || '';
-                    estado.className = /EVACUACION|ALERTA/i.test(medicion.estado || '')
+                    const nivelCritico = alturaMetros >= 7;
+                    estado.textContent = nivelCritico ? 'Alerta' : 'Alerta estable';
+                    estado.className = nivelCritico
                         ? 'text-sm font-bold text-red-700 dark:text-red-300'
-                        : 'text-sm font-semibold text-slate-600 dark:text-slate-300';
+                        : 'text-sm font-bold text-emerald-700 dark:text-emerald-300';
                     mensaje.textContent = `Última medición informada por Prefectura: ${medicion.fechaMedicionOrigen}.`;
                     detalles.textContent =
                         `Río ${medicion.rio} · Período informado por Prefectura: ${medicion.periodoHoras ?? '—'} h · ` +
