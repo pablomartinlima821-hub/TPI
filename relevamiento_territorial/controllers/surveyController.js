@@ -7,6 +7,7 @@ const {
     UMBRAL_EVACUACION_METROS
 } = require('../Servicios/relevamientoServicio');
 const { generarResumenTerritorial } = require('../../services/djangoReportService');
+const { emitirActualizacion } = require('../../services/realtimeService');
 const Barrio = require('../../models/Barrio');
 
 const ESTACION_RIO = 'GOYA';
@@ -154,6 +155,7 @@ const crearRegistro = async (req, res) => {
         });
 
         await nuevoRelevamiento.save();
+        emitirActualizacion('reports.changed');
         return res.status(201).json({ mensaje: 'Relevamiento guardado.', data: nuevoRelevamiento });
     } catch (error) {
         return res.status(500).json({ mensaje: 'Error al guardar el relevamiento.', error: error.message });
@@ -314,6 +316,7 @@ const actualizarRegistro = async (req, res) => {
             return res.status(404).json({ mensaje: 'Registro de relevamiento no encontrado.' });
         }
 
+        emitirActualizacion('reports.changed');
         return res.status(200).json({ mensaje: 'Relevamiento actualizado exitosamente.', data: registroActualizado });
     } catch (error) {
         return res.status(500).json({ mensaje: 'Error al actualizar el relevamiento.', error: error.message });
@@ -351,6 +354,7 @@ const actualizarSeguimiento = async (req, res) => {
             return res.status(404).json({ mensaje: 'No se encontró el relevamiento.' });
         }
 
+        emitirActualizacion('reports.changed');
         return res.status(200).json({ mensaje: 'Seguimiento actualizado.', data: relevamiento });
     } catch (error) {
         return res.status(500).json({ mensaje: 'No se pudo actualizar el seguimiento.', error: error.message });

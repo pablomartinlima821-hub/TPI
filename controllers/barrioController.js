@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const Barrio = require('../models/Barrio');
 const Relevamiento = require('../relevamiento_territorial/models/Relevamiento');
+const { emitirActualizacion } = require('../services/realtimeService');
 
 const BARRIOS_INICIALES = [
     {
@@ -224,6 +225,7 @@ const actualizarBarrio = async (req, res) => {
             return res.status(404).json({ mensaje: 'No se encontró el barrio que quieres editar.' });
         }
 
+        emitirActualizacion('neighborhoods.changed');
         return res.status(200).json({ mensaje: 'Barrio actualizado.', data: barrio });
     } catch (error) {
         console.error(`No se pudo actualizar el barrio: ${error.message}`);
@@ -243,6 +245,7 @@ const eliminarBarrio = async (req, res) => {
             return res.status(404).json({ mensaje: 'No se encontró el barrio que quieres eliminar.' });
         }
 
+        emitirActualizacion('neighborhoods.changed');
         return res.status(200).json({ mensaje: 'Barrio eliminado de la lista.' });
     } catch (error) {
         console.error(`No se pudo eliminar el barrio: ${error.message}`);

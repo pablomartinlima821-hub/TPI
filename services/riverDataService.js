@@ -2,6 +2,7 @@ const MedicionRio = require('../models/MedicionRio');
 const https = require('https');
 const crypto = require('crypto');
 const dns = require('dns');
+const { emitirActualizacion } = require('./realtimeService');
 
 const FUENTE_URL = 'https://contenidosweb.prefecturanaval.gob.ar/alturas/';
 const ESTACION = 'GOYA';
@@ -19,6 +20,7 @@ const estadoSincronizacion = {
 
 let temporizador = null;
 let sincronizacionEnCurso = null;
+let ultimaMedicionPublicada = null;
 
 const buscarIpv4 = (hostname, opciones, callback) => {
     dns.lookup(hostname, { ...opciones, family: 4, all: false }, callback);
@@ -203,6 +205,17 @@ async function consultarYGuardarMedicion() {
                 { $set: { ...medicion, consultadoEn } },
                 { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
             ).lean();
+
+            const fechaMedicion = documento?.fechaMedicion || medicion.fechaMedicion;
+            const claveMedicion = [
+                documento?.estacion || medicion.estacion,
+                new Date(fechaMedicion).toISOString(),
+                documento?.alturaMetros ?? medicion.alturaMetros
+            ].join(':');
+            if (claveMedicion !== ultimaMedicionPublicada) {
+                ultimaMedicionPublicada = claveMedicion;
+                emitirActualizacion('river.updated');
+            }
 
             estadoSincronizacion.ultimaConsultaExitosa = consultadoEn;
             estadoSincronizacion.ultimoError = null;

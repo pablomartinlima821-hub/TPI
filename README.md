@@ -74,6 +74,11 @@ seguir cada reporte como pendiente, en atención o resuelto. La clasificación d
 evacuación usa el umbral de 7 m definido por el proyecto; no es una alerta oficial
 ni modifica automáticamente la situación manual de los barrios.
 
+Los cambios nuevos en el nivel del río, reportes y barrios se notifican al
+navegador mediante WebSocket autenticado; los datos se vuelven a consultar por
+la API existente. Si se pierde esa conexión, el refresco periódico se mantiene
+como respaldo.
+
 ## Ejecutar el proyecto en otra computadora
 
 Las instrucciones siguientes corresponden a Windows y permiten iniciar tanto el

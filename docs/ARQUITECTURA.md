@@ -50,6 +50,10 @@ está disponible, Node informa un error `503`/`502`; no inventa un resumen.
 - Node usa **rutas → controladores → modelos/servicios**. Los controladores
   orquestan la petición; `services/djangoReportService.js` encapsula la llamada
   HTTP a Django.
+- Node publica señales de cambio por WebSocket autenticado en
+  `/api/updates`. El cliente se autentica enviando su JWT al conectar; los
+  mensajes solo indican qué sección cambió y el navegador vuelve a consultar
+  la API REST autorizada para recibir los datos.
 - Django usa **vistas → serializers → permisos** de Django REST Framework. El
   serializer valida las métricas recibidas antes de calcularlas.
 - La integración es una API REST interna con contrato JSON. Los servicios
@@ -62,6 +66,7 @@ está disponible, Node informa un error `503`/`502`; no inventa un resumen.
 | Node | `GET /web` | Página web |
 | Node | `GET /api/relevamientos/resumen` | JWT de administrador; integra con Django |
 | Node | `GET/POST /api/relevamientos` | JWT según rol |
+| Node | `WS /api/updates` | JWT enviado como primer mensaje; señales de cambios |
 | Node | `GET /api/usuarios`, `GET /api/usuarios/:id` | JWT de administrador |
 | Node | `PATCH /api/usuarios/:id`, `DELETE /api/usuarios/:id` | JWT de administrador |
 | Django | `GET /api/health/` | Pública; verificación de disponibilidad |
@@ -78,6 +83,12 @@ y no permite que un administrador borre su propia cuenta desde esta API. Los
 registros nuevos tienen rol `encuestador`; el proyecto no crea un administrador
 inicial por API, por lo que la primera cuenta administradora debe configurarse
 directamente en MongoDB.
+
+El frontend recibe señales en vivo para cambios en mediciones del río,
+relevamientos y barrios. Si la conexión WebSocket se pierde, conserva el
+refresco periódico: río y barrios cada minuto mientras el panel principal está
+abierto, y reportes cada minuto mientras el panel de administración está
+abierto. El río también se consulta a Prefectura cada 15 minutos desde Node.
 
 ## Variables de entorno
 

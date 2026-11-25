@@ -475,6 +475,7 @@
         const API_URL = window.location.protocol === 'file:'
             ? 'http://localhost:5000'
             : window.location.origin;
+        const WEBSOCKET_URL = API_URL.replace(/^http/, 'ws');
 
         let mapInstance = null;
         let tileLayer = null;
@@ -485,10 +486,15 @@
         let riverStatusTimer = null;
         let riverStatusRequest = null;
         let reportsRefreshTimer = null;
+        let neighborhoodRefreshTimer = null;
+        let realtimeSocket = null;
+        let realtimeReconnectTimer = null;
+        let realtimeReconnectDelay = 1000;
         let reportsRefreshInProgress = false;
         let reportsSummaryRefreshInProgress = false;
         let reportsSummaryRefreshQuery = null;
         let pendingReportsSummaryQuery = null;
+        let neighborhoodsRefreshInProgress = false;
         let barrios = [];
         let barriosMarkerLayer = null;
         let editingBarrioClave = null;
@@ -539,6 +545,78 @@
             }
             return data;
         };
+
+        function procesarEventoRealtime(tipo) {
+            const panelReportesVisible = !document.getElementById('admin-reports-panel').classList.contains('hidden');
+
+            if (tipo === 'river.updated') {
+                void actualizarEstadoRio();
+                const nivelRioInput = document.querySelector('#new-report-form [name="nivelRioParana"]');
+                if (panelReportesVisible && nivelRioInput.dataset.origen === 'prefectura') {
+                    void cargarNivelRioActual();
+                }
+            } else if (tipo === 'reports.changed' && panelReportesVisible) {
+                void actualizarPanelRelevamientos();
+            } else if (tipo === 'neighborhoods.changed') {
+                if (mapInstance) void actualizarBarrios();
+                if (panelReportesVisible) void actualizarPanelRelevamientos();
+            }
+        }
+
+        function programarReconectarRealtime() {
+            if (!localStorage.getItem('token') || realtimeReconnectTimer) return;
+
+            const espera = realtimeReconnectDelay;
+            realtimeReconnectDelay = Math.min(realtimeReconnectDelay * 2, 30000);
+            realtimeReconnectTimer = setTimeout(() => {
+                realtimeReconnectTimer = null;
+                conectarActualizacionesRealtime();
+            }, espera);
+        }
+
+        function conectarActualizacionesRealtime() {
+            const token = localStorage.getItem('token');
+            if (!token || (realtimeSocket &&
+                [WebSocket.CONNECTING, WebSocket.OPEN].includes(realtimeSocket.readyState))) return;
+            if (realtimeReconnectTimer) {
+                clearTimeout(realtimeReconnectTimer);
+                realtimeReconnectTimer = null;
+            }
+
+            try {
+                const socket = new WebSocket(`${WEBSOCKET_URL}/api/updates`);
+                realtimeSocket = socket;
+                socket.addEventListener('open', () => {
+                    socket.send(JSON.stringify({ type: 'authenticate', token }));
+                });
+                socket.addEventListener('message', (event) => {
+                    let mensaje;
+                    try {
+                        mensaje = JSON.parse(event.data);
+                    } catch (error) {
+                        console.warn('Se recibió un mensaje WebSocket inválido.');
+                        return;
+                    }
+
+                    if (mensaje.type === 'authenticated') {
+                        realtimeReconnectDelay = 1000;
+                    } else {
+                        procesarEventoRealtime(mensaje.type);
+                    }
+                });
+                socket.addEventListener('close', () => {
+                    if (realtimeSocket === socket) realtimeSocket = null;
+                    programarReconectarRealtime();
+                });
+                socket.addEventListener('error', () => {
+                    console.warn('WebSocket no disponible; se mantienen las actualizaciones periódicas.');
+                });
+            } catch (error) {
+                console.warn(`No se pudo iniciar WebSocket: ${error.message}`);
+                realtimeSocket = null;
+                programarReconectarRealtime();
+            }
+        }
 
         function mostrarBarrios() {
             const lista = document.getElementById('neighborhood-list');
@@ -676,6 +754,8 @@
         }
 
         async function actualizarBarrios() {
+            if (neighborhoodsRefreshInProgress) return;
+            neighborhoodsRefreshInProgress = true;
             const mensaje = document.getElementById('neighborhood-message');
             try {
                 barrios = await barriosApi('/');
@@ -684,6 +764,8 @@
             } catch (error) {
                 mensaje.className = 'text-xs mt-2 text-red-500';
                 mensaje.textContent = error.message;
+            } finally {
+                neighborhoodsRefreshInProgress = false;
             }
         }
 
@@ -1611,9 +1693,15 @@
             document.getElementById('dashboard-container').classList.remove('hidden');
             document.getElementById('admin-panel-button').classList.toggle('hidden', currentUser?.rol !== 'admin');
             document.getElementById('edit-neighborhoods-button').classList.toggle('hidden', currentUser?.rol !== 'admin');
+            conectarActualizacionesRealtime();
             volverDashboardPrincipal();
             actualizarEstadoRio();
             if (!riverStatusTimer) riverStatusTimer = setInterval(actualizarEstadoRio, 60 * 1000);
+            if (!neighborhoodRefreshTimer) {
+                neighborhoodRefreshTimer = setInterval(() => {
+                    if (mapInstance) void actualizarBarrios();
+                }, 60 * 1000);
+            }
             
             setTimeout(() => {
                 if (!mapInstance) {
@@ -1637,9 +1725,21 @@
         function cerrarSesion(mensaje = '') {
             localStorage.removeItem('token');
             currentUser = null;
+            if (realtimeReconnectTimer) {
+                clearTimeout(realtimeReconnectTimer);
+                realtimeReconnectTimer = null;
+            }
+            if (realtimeSocket) {
+                realtimeSocket.close();
+                realtimeSocket = null;
+            }
             if (riverStatusTimer) {
                 clearInterval(riverStatusTimer);
                 riverStatusTimer = null;
+            }
+            if (neighborhoodRefreshTimer) {
+                clearInterval(neighborhoodRefreshTimer);
+                neighborhoodRefreshTimer = null;
             }
             if (reportsRefreshTimer) {
                 clearInterval(reportsRefreshTimer);
